@@ -13,6 +13,8 @@ def create_app(config_name='default'):
     app.config.from_object(config[config_name])
     if config_name != 'development' and not app.config.get('SECRET_KEY'):
         raise RuntimeError('SECRET_KEY must be configured outside development.')
+    if config_name != 'development' and not app.config.get('SQLALCHEMY_DATABASE_URI'):
+        raise RuntimeError('DATABASE_URL must be configured outside development.')
     
     db.init_app(app)
     login_manager.init_app(app)
