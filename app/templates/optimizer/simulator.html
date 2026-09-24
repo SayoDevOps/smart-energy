@@ -1,0 +1,231 @@
+{% extends "base.html" %}
+
+{% block title %}Energy Scenario - Smart Energy Monitor{% endblock %}
+{% block page_title %}Energy Scenario{% endblock %}
+{% block page_subtitle %}<p class="app-page-subtitle">See how changing your appliance usage could affect your monthly energy cost.</p>{% endblock %}
+
+{% block content %}
+<div class="simulator-page">
+    {% if appliances %}
+    <section class="simulator-summary" aria-live="polite" aria-label="Simulation summary">
+        <div class="simulator-summary-heading">
+            <div>
+                <span class="simulator-kicker"><i class="fa-solid fa-wand-magic-sparkles"></i> Scenario planning</span>
+                <h2>Estimated monthly impact</h2>
+            </div>
+            <div class="simulator-tariff">Band {{ current_user.tariff_band.band if current_user.tariff_band else '--' }} · {{ tariff_rate | naira }}/kWh</div>
+        </div>
+        <div class="simulator-summary-grid">
+            <div class="simulator-summary-stat">
+                <span class="simulator-label">Current</span>
+                <strong id="currentCost">₦0.00</strong>
+                <small><span id="currentKwh">0.00</span> kWh/month</small>
+            </div>
+            <div class="simulator-summary-stat what-if-stat">
+                <span class="simulator-label">Scenario</span>
+                <strong id="whatIfCost">₦0.00</strong>
+                <small><span id="whatIfKwh">0.00</span> kWh/month</small>
+            </div>
+            <div class="simulator-summary-stat saving-stat">
+                <span class="simulator-label">Estimated monthly saving</span>
+                <strong id="savingAmount">₦0.00</strong>
+                <small id="percentageChange">0.0% change in cost</small>
+            </div>
+        </div>
+        <div class="simulator-summary-footer">
+            <span><i class="fa-solid fa-clock"></i> Daily hours changed: <strong id="hoursChanged">0.0 hrs</strong></span>
+            <button type="button" class="btn-em-secondary simulator-reset" id="resetSimulator">
+                <i class="fa-solid fa-rotate-left"></i> Reset Changes
+            </button>
+        </div>
+    </section>
+
+    <div class="simulator-section-heading">
+        <div>
+            <span class="simulator-kicker">Appliance controls</span>
+            <h2>Shape your scenario</h2>
+        </div>
+        <span class="simulator-help"><i class="fa-solid fa-circle-info"></i> Changes are for comparison only</span>
+    </div>
+
+    <section class="simulator-appliance-grid" aria-label="Appliance usage controls">
+        {% for appliance in appliances %}
+        <article class="simulator-appliance" data-wattage="{{ appliance.wattage }}" data-current-hours="{{ appliance.avg_daily_hours }}">
+            <div class="simulator-appliance-header">
+                <div class="simulator-appliance-title">
+                    <span class="simulator-appliance-icon"><i class="fa-solid fa-plug"></i></span>
+                    <div>
+                        <h3>{{ appliance.name }}</h3>
+                        <span>{{ appliance.category | title }} · {{ appliance.wattage | int }}W</span>
+                    </div>
+                </div>
+                <span class="simulator-hours-badge"><strong class="selected-hours">{{ appliance.avg_daily_hours | round(1) }}</strong> hrs/day</span>
+            </div>
+
+            <div class="simulator-range-row">
+                <span>0 hrs</span>
+                <input class="simulator-slider" type="range" min="0" max="24" step="0.5" value="{{ appliance.avg_daily_hours }}" aria-label="Daily hours for {{ appliance.name }}">
+                <span>24 hrs</span>
+            </div>
+            <div class="simulator-range-caption"><span>Current: <strong class="current-hours">{{ appliance.avg_daily_hours | round(1) }} hrs/day</strong></span><span>Selected: <strong class="selected-hours-caption">{{ appliance.avg_daily_hours | round(1) }} hrs/day</strong></span></div>
+
+            <div class="simulator-cost-grid">
+                <div><span>Current monthly cost</span><strong class="current-appliance-cost">₦0.00</strong></div>
+                <div><span>Scenario monthly cost</span><strong class="what-if-appliance-cost">₦0.00</strong></div>
+            </div>
+        </article>
+        {% endfor %}
+    </section>
+    {% else %}
+    <section class="simulator-empty-state">
+        <div class="simulator-empty-icon"><i class="fa-solid fa-plug-circle-xmark"></i></div>
+        <h2>No appliances to simulate</h2>
+        <p>Add appliances with their wattage and typical daily hours to explore different energy scenarios.</p>
+        <a href="{{ url_for('appliances.list_appliances') }}" class="btn-em-primary">
+            <i class="fa-solid fa-plug"></i> Go to My Appliances
+        </a>
+    </section>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .simulator-page { max-width: 1180px; margin: 0 auto; }
+    .simulator-summary { background:var(--surface); border:1px solid var(--border); border-top:3px solid var(--navy); border-radius:var(--radius-lg); color:var(--navy); padding:22px 24px; margin-bottom:28px; }
+    .simulator-summary-heading, .simulator-section-heading, .simulator-summary-footer { display:flex; align-items:center; justify-content:space-between; gap:18px; }
+    .simulator-summary-heading h2, .simulator-section-heading h2 { margin:4px 0 0; color:inherit; font-family:'Plus Jakarta Sans',sans-serif; font-size:20px; font-weight:800; }
+    .simulator-kicker { color:var(--green); font-size:11px; font-weight:700; letter-spacing:1px; text-transform:uppercase; }
+    .simulator-kicker i { margin-right:5px; }
+    .simulator-tariff { color:var(--text-muted); font-size:12px; white-space:nowrap; }
+    .simulator-summary-grid { display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:14px; margin-top:22px; }
+    .simulator-summary-stat { min-width:0; padding:10px 18px; border:0; border-left:1px solid var(--border); border-radius:0; background:transparent; }
+    .simulator-summary-stat:first-child { border-left:0; padding-left:0; }
+    .simulator-summary-stat.what-if-stat { border-color:var(--border); }
+    .simulator-summary-stat.saving-stat { border-color:var(--border); }
+    .simulator-label { display:block; color:var(--text-muted); font-size:11px; font-weight:700; letter-spacing:.8px; text-transform:uppercase; }
+    .simulator-summary-stat strong { display:block; margin-top:5px; color:var(--navy); font-family:'Plus Jakarta Sans',sans-serif; font-size:25px; line-height:1.2; }
+    .simulator-summary-stat small { display:block; margin-top:5px; color:var(--text-muted); font-size:12px; }
+    .simulator-summary-footer { margin-top:18px; padding-top:14px; border-top:1px solid var(--border); color:var(--text-mid); font-size:12px; }
+    .simulator-summary-footer i { color:var(--green); margin-right:5px; }
+    .simulator-summary-footer strong { color:var(--navy); }
+    .simulator-reset { color:var(--navy); border-color:var(--border); background:var(--surface); }
+    .simulator-reset:hover { color:var(--navy); background:var(--surface-2); border-color:#cbd5e1; }
+    .simulator-section-heading { margin-bottom:16px; }
+    .simulator-section-heading h2 { color:var(--navy); font-size:19px; }
+    .simulator-help { color:var(--text-muted); font-size:12px; }
+    .simulator-help i { color:var(--green); margin-right:5px; }
+    .simulator-appliance-grid { display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:16px; }
+    .simulator-appliance { min-width:0; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-lg); padding:20px; box-shadow:none; }
+    .simulator-appliance-header { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; }
+    .simulator-appliance-title { display:flex; align-items:center; gap:11px; min-width:0; }
+    .simulator-appliance-icon { display:flex; align-items:center; justify-content:center; flex:0 0 30px; width:30px; height:30px; border-radius:6px; background:var(--surface-2); color:var(--green); }
+    .simulator-appliance-title h3 { overflow-wrap:anywhere; margin:0; color:var(--navy); font-family:'Plus Jakarta Sans',sans-serif; font-size:15px; font-weight:700; }
+    .simulator-appliance-title span { display:block; margin-top:3px; color:var(--text-muted); font-size:11px; }
+    .simulator-hours-badge { flex:0 0 auto; padding:5px 8px; border-radius:6px; background:var(--surface-2); color:var(--text-mid); font-size:11px; white-space:nowrap; }
+    .simulator-hours-badge strong { color:var(--navy); font-family:'Plus Jakarta Sans',sans-serif; font-size:14px; }
+    .simulator-range-row { display:grid; grid-template-columns:auto minmax(0,1fr) auto; align-items:center; gap:9px; margin-top:22px; color:var(--text-muted); font-size:10px; }
+    .simulator-slider { width:100%; accent-color:var(--green); cursor:pointer; }
+    .simulator-range-caption { display:flex; justify-content:space-between; gap:10px; margin-top:7px; color:var(--text-muted); font-size:11px; }
+    .simulator-range-caption strong { color:var(--navy); }
+    .simulator-cost-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:18px; padding-top:14px; border-top:1px solid var(--border); }
+    .simulator-cost-grid div { min-width:0; }
+    .simulator-cost-grid span { display:block; color:var(--text-muted); font-size:10px; line-height:1.35; }
+    .simulator-cost-grid strong { display:block; margin-top:4px; color:var(--navy); font-family:'Plus Jakarta Sans',sans-serif; font-size:16px; overflow-wrap:anywhere; }
+    .simulator-cost-grid div:last-child strong { color:var(--green); }
+    .simulator-empty-state { padding:64px 24px; border:1px dashed var(--border); border-radius:var(--radius-lg); background:var(--surface); text-align:center; }
+    .simulator-empty-icon { color:var(--green); font-size:42px; margin-bottom:15px; }
+    .simulator-empty-state h2 { margin:0 0 7px; color:var(--navy); font-family:'Plus Jakarta Sans',sans-serif; font-size:20px; }
+    .simulator-empty-state p { max-width:360px; margin:0 auto 20px; color:var(--text-muted); font-size:13px; }
+    @media (max-width:768px) {
+        .simulator-summary { padding:18px; margin-bottom:22px; }
+        .simulator-summary-heading, .simulator-summary-footer { align-items:flex-start; flex-direction:column; gap:10px; }
+        .simulator-summary-heading h2 { font-size:18px; }
+        .simulator-tariff { white-space:normal; }
+        .simulator-summary-grid { grid-template-columns:1fr; gap:9px; margin-top:16px; }
+        .simulator-summary-stat { padding:12px 0; border-left:0; border-top:1px solid var(--border); }
+        .simulator-summary-stat:first-child { border-top:0; padding-left:0; }
+        .simulator-summary-stat strong { font-size:22px; }
+        .simulator-reset { width:100%; justify-content:center; }
+        .simulator-section-heading { align-items:flex-start; flex-direction:column; gap:7px; }
+        .simulator-appliance-grid { grid-template-columns:1fr; gap:12px; }
+        .simulator-appliance { padding:16px; }
+        .simulator-appliance-header { gap:8px; }
+        .simulator-hours-badge { font-size:10px; }
+        .simulator-cost-grid strong { font-size:15px; }
+    }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const tariffRate = Number({{ tariff_rate | tojson }});
+        const cards = Array.from(document.querySelectorAll('.simulator-appliance'));
+        const currentCostElement = document.getElementById('currentCost');
+        const whatIfCostElement = document.getElementById('whatIfCost');
+        const savingElement = document.getElementById('savingAmount');
+        const currentKwhElement = document.getElementById('currentKwh');
+        const whatIfKwhElement = document.getElementById('whatIfKwh');
+        const percentageElement = document.getElementById('percentageChange');
+        const hoursChangedElement = document.getElementById('hoursChanged');
+
+        if (!cards.length) return;
+
+        const formatMoney = value => `₦${value.toLocaleString('en-NG', {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
+        })}`;
+        const formatHours = value => `${value.toFixed(1)} hrs/day`;
+        const monthlyKwh = (wattage, hours) => (wattage / 1000) * hours * 30;
+
+        function updateSimulation() {
+            let currentKwh = 0;
+            let whatIfKwh = 0;
+            let currentDailyHours = 0;
+            let selectedDailyHours = 0;
+
+            cards.forEach(card => {
+                const wattage = Number(card.dataset.wattage);
+                const currentHours = Number(card.dataset.currentHours);
+                const slider = card.querySelector('.simulator-slider');
+                const selectedHours = Number(slider.value);
+                const currentApplianceKwh = monthlyKwh(wattage, currentHours);
+                const whatIfApplianceKwh = monthlyKwh(wattage, selectedHours);
+
+                currentKwh += currentApplianceKwh;
+                whatIfKwh += whatIfApplianceKwh;
+                currentDailyHours += currentHours;
+                selectedDailyHours += selectedHours;
+
+                card.querySelector('.selected-hours').textContent = selectedHours.toFixed(1);
+                card.querySelector('.selected-hours-caption').textContent = formatHours(selectedHours);
+                card.querySelector('.current-appliance-cost').textContent = formatMoney(currentApplianceKwh * tariffRate);
+                card.querySelector('.what-if-appliance-cost').textContent = formatMoney(whatIfApplianceKwh * tariffRate);
+            });
+
+            const currentCost = currentKwh * tariffRate;
+            const whatIfCost = whatIfKwh * tariffRate;
+            const saving = currentCost - whatIfCost;
+            const percentageChange = currentCost > 0 ? ((whatIfCost - currentCost) / currentCost) * 100 : 0;
+
+            currentKwhElement.textContent = currentKwh.toFixed(2);
+            whatIfKwhElement.textContent = whatIfKwh.toFixed(2);
+            currentCostElement.textContent = formatMoney(currentCost);
+            whatIfCostElement.textContent = formatMoney(whatIfCost);
+            savingElement.textContent = formatMoney(saving);
+            percentageElement.textContent = `${percentageChange.toFixed(1)}% change in cost`;
+            hoursChangedElement.textContent = `${(selectedDailyHours - currentDailyHours).toFixed(1)} hrs`;
+        }
+
+        cards.forEach(card => card.querySelector('.simulator-slider').addEventListener('input', updateSimulation));
+        document.getElementById('resetSimulator').addEventListener('click', function () {
+            cards.forEach(card => {
+                card.querySelector('.simulator-slider').value = card.dataset.currentHours;
+            });
+            updateSimulation();
+        });
+        updateSimulation();
+    });
+</script>
+{% endblock %}

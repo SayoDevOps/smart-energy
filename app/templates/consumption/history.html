@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+
+{% block title %}Consumption History | Smart Energy Monitor{% endblock %}
+{% block page_title %}Consumption History{% endblock %}
+{% block page_subtitle %}<p class="app-page-subtitle">All your logged readings</p>{% endblock %}
+{% block page_actions %}
+<div class="app-page-actions">
+    <a href="{{ url_for('consumption.log_consumption') }}" class="btn-em-primary">
+        <i class="fa-solid fa-plus" aria-hidden="true"></i> Log New Reading
+    </a>
+</div>
+{% endblock %}
+
+{% block content %}
+<section class="history-summary" aria-label="Consumption totals">
+    <div class="history-summary-item">
+        <span>Total energy</span>
+        <strong>{{ "%.1f"|format(total_kwh) }} <small>kWh</small></strong>
+    </div>
+    <div class="history-summary-item">
+        <span>Total spent</span>
+        <strong>{{ total_cost | naira }}</strong>
+    </div>
+</section>
+
+{% if logs.items %}
+<div class="em-card history-table-card">
+    <div class="history-table-wrap">
+        <table class="em-table history-table">
+            <thead>
+                <tr><th>Date</th><th>Source</th><th>kWh</th><th>Cost</th><th>Appliance</th><th><span class="visually-hidden">Actions</span></th></tr>
+            </thead>
+            <tbody>
+                {% for log in logs.items %}
+                <tr>
+                    <td>{{ log.log_date.strftime("%d %b, %Y") }}</td>
+                    <td>
+                        {% if log.source == 'grid' %}
+                        <span class="badge-navy">Grid</span>
+                        {% else %}
+                        <span class="badge-amber">Generator</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ "%.2f"|format(log.kwh_consumed) }}</td>
+                    <td class="history-cost">
+                        {% if log.fuel_cost is not none %}
+                        {{ log.fuel_cost | naira }}
+                        {% elif log.source == 'grid' %}
+                        {{ (log.kwh_consumed * tariff_rate) | naira }}
+                        {% else %}
+                        —
+                        {% endif %}
+                    </td>
+                    <td class="history-appliance">{{ log.appliance.name if log.appliance else '—' }}</td>
+                    <td class="text-end">
+                        <form method="POST" action="{{ url_for('consumption.delete_log', log_id=log.id) }}" class="d-inline" onsubmit="return confirm('Delete this entry?');">
+                            <button type="submit" class="btn-em-danger history-delete" aria-label="Delete reading from {{ log.log_date.strftime('%d %b, %Y') }}">
+                                <i class="fa-solid fa-trash-can" aria-hidden="true"></i>
+                            </button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% if logs.has_prev or logs.has_next %}
+<nav class="history-pagination" aria-label="Consumption history pages">
+    <ul class="pagination justify-content-center mb-0">
+        {% if logs.has_prev %}<li class="page-item"><a class="page-link" href="{{ url_for('consumption.history', page=logs.prev_num) }}">Previous</a></li>{% endif %}
+        <li class="page-item disabled"><span class="page-link">Page {{ logs.page }} of {{ logs.pages }}</span></li>
+        {% if logs.has_next %}<li class="page-item"><a class="page-link" href="{{ url_for('consumption.history', page=logs.next_num) }}">Next</a></li>{% endif %}
+    </ul>
+</nav>
+{% endif %}
+{% else %}
+<div class="em-card">
+    <div class="empty-state">
+        <div class="empty-state-icon"><i class="fa-solid fa-clipboard-list" aria-hidden="true"></i></div>
+        <h2 class="empty-state-title">No consumption records yet</h2>
+        <p class="empty-state-text">Log your first meter reading or generator hours. Seven days of data is enough for a bill estimate.</p>
+        <a href="{{ url_for('consumption.log_consumption') }}" class="btn-em-primary">Log Your First Reading</a>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .history-summary { display:flex; gap:32px; margin:0 0 22px; padding:0 0 18px; border-bottom:1px solid var(--border); }
+    .history-summary-item { min-width:160px; }
+    .history-summary-item span { display:block; color:var(--text-muted); font-size:12px; }
+    .history-summary-item strong { display:block; margin-top:3px; color:var(--navy); font-family:'Plus Jakarta Sans',sans-serif; font-size:22px; font-weight:700; }
+    .history-summary-item small { color:var(--text-mid); font-family:'DM Sans',sans-serif; font-size:13px; font-weight:500; }
+    .history-table-card { margin-bottom:14px; }
+    .history-table-wrap { width:100%; max-width:100%; min-width:0; overflow-x:auto; }
+    .history-table { min-width:700px; }
+    .history-table th:nth-child(3), .history-table th:nth-child(4), .history-table td:nth-child(3), .history-table td:nth-child(4) { text-align:right; }
+    .history-table th:nth-child(5), .history-table td:nth-child(5) { min-width:150px; }
+    .history-cost { color:var(--navy); font-weight:700; white-space:nowrap; }
+    .history-appliance { color:var(--text-mid); }
+    .history-delete { width:34px; height:34px; padding:0; justify-content:center; }
+    .history-pagination .page-link { color:var(--navy); border-color:var(--border); }
+    .history-pagination .page-item.active .page-link { background:var(--navy); border-color:var(--navy); }
+    @media (max-width:600px) {
+        .history-table-card { min-width:0; max-width:100%; }
+        .history-table-wrap { width:100%; max-width:100%; }
+        .history-table { min-width:0; width:100%; table-layout:fixed; font-size:11px; }
+        .history-table th, .history-table td { padding:8px 4px; }
+        .history-table th:nth-child(1) { width:18%; }
+        .history-table th:nth-child(2) { width:18%; }
+        .history-table th:nth-child(3) { width:12%; }
+        .history-table th:nth-child(4) { width:18%; }
+        .history-table th:nth-child(5) { width:23%; min-width:0; }
+        .history-table th:nth-child(6) { width:11%; }
+        .history-table td { overflow-wrap:anywhere; }
+        .history-delete { width:28px; height:28px; }
+        .history-summary { gap:20px; }
+        .history-summary-item { min-width:0; flex:1; }
+        .history-summary-item strong { font-size:19px; }
+        .app-page-actions .btn-em-primary { padding:10px 12px; font-size:12px; }
+    }
+</style>
+{% endblock %}

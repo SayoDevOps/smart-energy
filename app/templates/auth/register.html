@@ -1,0 +1,275 @@
+{% extends "base.html" %}
+{% block title %}Create Account — Smart Energy Monitor{% endblock %}
+
+{% block auth_content %}
+
+<h1 class="auth-form-title">Create account</h1>
+<p class="auth-form-subtitle">Start monitoring your energy costs today</p>
+
+<form method="POST" novalidate>
+
+    <div class="mb-3">
+        <label class="form-label">Full Name</label>
+        <div class="input-icon-wrap">
+            <i class="fa-solid fa-user"></i>
+            <input
+                type="text"
+                name="full_name"
+                class="form-control"
+                placeholder="e.g. Adebayo Samuel"
+                autocomplete="name"
+                required>
+        </div>
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label">Email Address</label>
+        <div class="input-icon-wrap">
+            <i class="fa-solid fa-envelope"></i>
+            <input
+                type="email"
+                name="email"
+                class="form-control"
+                placeholder="you@example.com"
+                autocomplete="email"
+                required>
+        </div>
+    </div>
+
+    <div class="mb-1">
+        <label class="form-label">Password</label>
+        <div class="input-icon-wrap">
+            <i class="fa-solid fa-lock"></i>
+            <input
+                type="password"
+                name="password"
+                id="regPassword"
+                class="form-control has-toggle"
+                placeholder="Min. 6 characters"
+                autocomplete="new-password"
+                required
+                minlength="6"
+                oninput="checkStrength(this.value)">
+            <button type="button"
+                    class="eye-toggle"
+                    id="regTogglePassword"
+                    aria-label="Toggle password visibility">
+                <i class="fa-solid fa-eye" id="regToggleIcon"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- Password strength bar -->
+    <div class="pwd-strength-wrap mb-3">
+        <div class="pwd-strength-bar">
+            <div class="pwd-strength-fill" id="strengthFill"></div>
+        </div>
+        <span class="pwd-strength-label" id="strengthLabel"></span>
+    </div>
+
+    <!-- Electricity Setup -->
+    <div class="reg-section-label">
+        <i class="fa-solid fa-bolt"></i>
+        Electricity Setup
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label">Household Type</label>
+        <select name="household_type" class="form-select">
+            <option value="residential">Residential</option>
+            <option value="commercial">Commercial</option>
+            <option value="small_business">Small Business</option>
+        </select>
+    </div>
+
+    <div class="mb-4">
+        <label class="form-label">NERC Tariff Band</label>
+        <select name="tariff_band_id" class="form-select" required onchange="updateBandInfo(this)">
+            <option value="">Select your band…</option>
+            {% for band in bands %}
+            <option value="{{ band.id }}"
+                    data-rate="{{ band.rate_per_kwh }}"
+                    data-hours="{{ band.service_hours }}">
+                Band {{ band.band }} — {{ band.description }} (&#8358;{{ band.rate_per_kwh }}/kWh)
+            </option>
+            {% endfor %}
+        </select>
+
+        <!-- Band info pill -->
+        <div class="band-info-pill" id="bandInfoPill" style="display:none;">
+            <i class="fa-solid fa-circle-info"></i>
+            <span id="bandInfoText"></span>
+        </div>
+
+        <div class="form-hint" style="margin-top: 6px;">
+            <i class="fa-solid fa-circle-question me-1"></i>
+            Check your electricity bill or ask your DISCO office.
+            <strong>Most Nigerian homes are Band C, D or E.</strong>
+        </div>
+    </div>
+
+    <button type="submit" class="btn-em-primary w-100" style="padding: 13px 24px; font-size: 15px;">
+        <i class="fa-solid fa-user-check"></i>
+        Create My Account
+    </button>
+
+</form>
+
+<div class="auth-link-line mt-4">
+    Already have an account?
+    <a href="{{ url_for('auth.login') }}">Sign in instead</a>
+</div>
+
+{% endblock %}
+
+
+{% block extra_css %}
+<style>
+    /* Strength bar */
+    .pwd-strength-wrap {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-top: 7px;
+    }
+    .pwd-strength-bar {
+        flex: 1;
+        height: 4px;
+        background: var(--border);
+        border-radius: 4px;
+        overflow: hidden;
+    }
+    .pwd-strength-fill {
+        height: 100%;
+        width: 0%;
+        border-radius: 4px;
+        transition: width 0.3s, background 0.3s;
+    }
+    .pwd-strength-label {
+        font-size: 11px;
+        font-weight: 600;
+        min-width: 44px;
+        text-align: right;
+    }
+
+    /* Section label */
+    .reg-section-label {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.8px;
+        text-transform: uppercase;
+        color: var(--text-muted);
+        margin: 4px 0 14px;
+        padding-bottom: 8px;
+        border-bottom: 1px solid var(--border);
+    }
+    .reg-section-label i {
+        font-size: 13px;
+        color: var(--green);
+    }
+
+    /* Band info pill */
+    .band-info-pill {
+        margin-top: 8px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        background: rgba(25,163,94,0.08);
+        border: 1px solid rgba(25,163,94,0.25);
+        border-radius: 8px;
+        padding: 8px 12px;
+        font-size: 12.5px;
+        color: #166534;
+        animation: fadeInDown 0.2s ease;
+    }
+    .band-info-pill i { color: var(--green); flex-shrink: 0; }
+
+    @keyframes fadeInDown {
+        from { opacity: 0; transform: translateY(-6px); }
+        to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Mobile responsiveness */
+    @media (max-width: 768px) {
+        .auth-form-title {
+            width: 100%;
+            display: block;
+            margin-bottom: 4px;
+        }
+
+        .auth-form-subtitle {
+            width: 100%;
+            display: block;
+            margin-bottom: 24px;
+        }
+    }
+</style>
+{% endblock %}
+
+
+{% block extra_js %}
+<script>
+const regToggleBtn = document.getElementById('regTogglePassword');
+if (regToggleBtn) {
+    regToggleBtn.addEventListener('click', function() {
+        const input = document.getElementById('regPassword');
+        const icon = document.getElementById('regToggleIcon');
+        if (input.type === 'password') {
+            input.type = 'text';
+            icon.className = 'fa-solid fa-eye-slash';
+        } else {
+            input.type = 'password';
+            icon.className = 'fa-solid fa-eye';
+        }
+    });
+}
+
+function checkStrength(val) {
+    const fill  = document.getElementById('strengthFill');
+    const label = document.getElementById('strengthLabel');
+    if (!val) { fill.style.width = '0%'; label.textContent = ''; return; }
+    let score = 0;
+    if (val.length >= 6)  score++;
+    if (val.length >= 10) score++;
+    if (/[A-Z]/.test(val)) score++;
+    if (/[0-9]/.test(val)) score++;
+    if (/[^A-Za-z0-9]/.test(val)) score++;
+    const levels = [
+        { w: '20%',  bg: '#ef4444', text: 'Weak',   color: '#ef4444' },
+        { w: '40%',  bg: '#f97316', text: 'Fair',   color: '#f97316' },
+        { w: '60%',  bg: '#eab308', text: 'Good',   color: '#ca8a04' },
+        { w: '80%',  bg: '#22c55e', text: 'Strong', color: '#16a34a' },
+        { w: '100%', bg: '#16a34a', text: 'Great!', color: '#15803d' },
+    ];
+    const l = levels[Math.min(score - 1, 4)] || levels[0];
+    fill.style.width      = l.w;
+    fill.style.background = l.bg;
+    label.textContent     = l.text;
+    label.style.color     = l.color;
+}
+
+function formatNaira(val) {
+    if (isNaN(val) || !val)
+        return '\u20A6' + '0.00';
+    return '\u20A6' + parseFloat(val)
+        .toLocaleString('en-NG', {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
+        });
+}
+
+function updateBandInfo(sel) {
+    const pill = document.getElementById('bandInfoPill');
+    const text = document.getElementById('bandInfoText');
+    const opt  = sel.options[sel.selectedIndex];
+    if (!sel.value) { pill.style.display = 'none'; return; }
+    const rate  = opt.dataset.rate;
+    const hours = opt.dataset.hours;
+    text.textContent = `${formatNaira(rate)}/kWh · ${hours}`;
+    pill.style.display = 'flex';
+}
+</script>
+{% endblock %}

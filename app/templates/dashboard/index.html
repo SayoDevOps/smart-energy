@@ -1,0 +1,609 @@
+{% extends "base.html" %}
+{% block title %}Dashboard - Smart Energy Monitor{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+
+{% block content %}
+
+{# Seasonal flag #}
+{% if seasonal %}
+<div class="seasonal-flag seasonal-{{ seasonal.level }} mb-4">
+    <span class="seasonal-icon" aria-hidden="true"><i class="fa-solid {{ 'fa-sun' if seasonal.season == 'dry' else 'fa-cloud-rain' }}"></i></span>
+    <span>{{ seasonal.message }}</span>
+</div>
+{% endif %}
+
+{# Anomaly alert #}
+{% if anomaly and anomaly.has_anomaly %}
+<div class="anomaly-alert mb-4">
+    <i class="fa-solid fa-triangle-exclamation" style="color: var(--amber); font-size: 20px; flex-shrink: 0;"></i>
+    <div>
+        <strong>
+            {% if anomaly.anomaly_type == 'spike' %}
+            Usage Spike Detected
+            {% else %}
+            Rising Trend Detected
+            {% endif %}
+        </strong>
+        <p style="margin: 4px 0 0; font-size: 13px;">{{ anomaly.message }}</p>
+    </div>
+</div>
+{% endif %}
+
+{# Anomaly alerts #}
+{% if alerts %}
+<div class="row mb-4">
+    <div class="col-12">
+        {% for alert in alerts %}
+        {% set alert_level = 'warning' if alert.severity == 'warning' else 'info' %}
+        <div class="alert alert-{{ alert_level }} d-flex align-items-center" role="alert" style="border-radius: var(--radius); border: none; font-size: 13.5px;">
+            <span class="me-3"><i class="fa-solid fa-triangle-exclamation" style="font-size: 18px;"></i></span>
+            <div class="fw-medium">{{ alert.message }}</div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+{# New user onboarding state #}
+{% if is_new_user %}
+
+<div class="onboarding-banner mb-4">
+    <div class="onboarding-inner">
+        <div class="onboarding-text">
+            <h2 class="onboarding-title">Welcome, {{ first_name }} <i class="fa-solid fa-bolt" style="color: rgb(99, 230, 190); font-size: 22px;"></i></h2>
+            <p class="onboarding-sub">
+                {% if current_user.tariff_band %}
+                You're set up on
+                <strong>Band {{ current_user.tariff_band.band }}
+                ({{ current_user.tariff_band.rate_per_kwh | naira }}/kWh)</strong>.
+                {% endif %}
+                Let's start tracking your energy costs.
+            </p>
+            <div class="onboarding-steps">
+                <div class="onboarding-step">
+                    <div class="step-num">1</div>
+                    <div class="step-text">
+                        <strong>Add your appliances</strong>
+                        <span>AC, fridge, bulbs - anything that uses power</span>
+                    </div>
+                </div>
+                <div class="onboarding-step">
+                    <div class="step-num">2</div>
+                    <div class="step-text">
+                        <strong>Log daily readings</strong>
+                        <span>Your meter reading or estimated kWh used</span>
+                    </div>
+                </div>
+                <div class="onboarding-step">
+                    <div class="step-num">3</div>
+                    <div class="step-text">
+                        <strong>See your prediction</strong>
+                        <span>Bill forecast appears after 7 days of data</span>
+                    </div>
+                </div>
+            </div>
+            <a href="{{ url_for('appliances.list_appliances') }}" class="btn-em-primary mt-3 d-inline-flex">
+                <i class="fa-solid fa-plug me-2"></i> Add Your First Appliance
+            </a>
+        </div>
+    </div>
+</div>
+
+{% endif %}
+
+{# Stat cards #}
+{% set predicted_card_tone = '' %}
+{% if predicted_bill and predicted_bill > 20000 %}
+    {% set predicted_card_tone = ' red' %}
+{% elif predicted_bill %}
+    {% set predicted_card_tone = ' amber' %}
+{% endif %}
+{% set top_appliance_value_class = ' stat-value-small' if top_appliance else '' %}
+<div class="stat-grid dashboard-financial-grid">
+
+        {# Primary financial measures #}
+    {# Card 1: Predicted Bill #}
+    <div class="stat-card stat-card-primary stat-card-predicted{{ predicted_card_tone }}">
+        <div class="stat-icon"><i class="fa-solid fa-bolt" style="color: var(--green);"></i></div>
+        <div class="stat-value">
+            {% if predicted_bill %}
+                {{ predicted_bill | naira }}
+            {% else %}
+                -
+            {% endif %}
+        </div>
+        <div class="stat-label">Predicted Bill This Month</div>
+        {% if predicted_bill %}
+        <div class="stat-sub">
+            {{ prediction.confidence | title }} confidence - {{ prediction.days_logged }} day{{ 's' if prediction.days_logged != 1 }} logged
+        </div>
+        {% else %}
+        <div class="stat-sub">Log usage for 7 days to see prediction</div>
+        {% endif %}
+    </div>
+
+    {# Card 5: True Energy Spend #}
+    <div class="stat-card navy stat-card-primary stat-card-spend">
+        <div class="stat-icon">
+            <i class="fa-solid fa-receipt" style="color: var(--green-light); font-size: 19px;"></i>
+        </div>
+        <div class="stat-value">
+            {% if true_total > 0 %}
+                {{ true_total | naira }}
+            {% else %}
+                -
+            {% endif %}
+        </div>
+        <div class="stat-label">True Energy Spend</div>
+        <div class="stat-sub">Grid + Generator combined</div>
+    </div>
+
+</div>
+
+{# Budget card #}
+<div class="row dashboard-budget-row mb-4">
+    <div class="col-12">
+        <div class="em-card dashboard-budget-card">
+            <div class="em-card-header">
+                <span class="em-card-header-title">
+                    <i class="fa-solid fa-wallet" style="color: var(--green); margin-right: 8px;"></i>
+                    Monthly Budget
+                </span>
+            </div>
+            <div class="em-card-body">
+                {% if budget_status_new %}
+                <div style="font-family: 'Plus Jakarta Sans', sans-serif; font-size: 20px; font-weight: 800; color: var(--navy); margin-bottom: 8px;">
+                    {% if budget_status_new.used %}
+                    {{ budget_status_new.used | naira }}
+                    <small style="font-size: 13px; color: var(--text-muted); font-weight: 500;">/ {{ budget_status_new.limit | naira }}</small>
+                    {% else %}
+                    {{ budget_status_new.limit | naira }}
+                    <small style="font-size: 13px; color: var(--text-muted); font-weight: 500;">budget set</small>
+                    {% endif %}
+                </div>
+                {% if budget_status_new.used %}
+                <div style="height: 8px; background: var(--border); border-radius: 8px; overflow: hidden; margin-bottom: 8px;">
+                    <div style="width: {{ budget_status_new.pct }}%; height: 100%; border-radius: 8px; {% if budget_status_new.color == 'green' %}background: var(--green);{% elif budget_status_new.color == 'amber' %}background: var(--amber);{% else %}background: #dc3545;{% endif %}"></div>
+                </div>
+                <div style="display: flex; justify-content: space-between; font-size: 11.5px; color: var(--text-muted);">
+                    <span>{{ budget_status_new.pct }}% used</span>
+                    {% if budget_status_new.overage > 0 %}
+                    <span style="color: #dc3545; font-weight: 600;">Over by {{ budget_status_new.overage | naira }}</span>
+                    {% else %}
+                    <span>On track</span>
+                    {% endif %}
+                </div>
+                {% else %}
+                <p style="font-size: 13px; color: var(--text-muted); margin-top: 8px;">Log your usage to see how your spending tracks against this budget.</p>
+                {% endif %}
+                {% else %}
+                <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 12px;">Set a monthly budget to track your spending.</p>
+                <form method="POST" action="{{ url_for('dashboard.set_budget') }}" style="display: flex; gap: 8px;">
+                    <input type="number" name="budget" class="form-control" placeholder="e.g. 20000" style="font-size: 13px;" required>
+                    <button type="submit" class="btn-em-primary" style="padding: 10px 16px; font-size: 12px;">Set</button>
+                </form>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="stat-grid dashboard-supporting-grid">
+    {# Card 2: kWh Consumed #}
+    <div class="stat-card">
+        <div class="stat-icon"><i class="fa-solid fa-chart-column"></i></div>
+        <div class="stat-value">
+            {% if kwh_this_month > 0 %}
+                {{ kwh_this_month }} <small style="font-size:16px; font-weight:500;">kWh</small>
+            {% else %}
+                -
+            {% endif %}
+        </div>
+        <div class="stat-label">kWh Used This Month</div>
+        {% if kwh_this_month > 0 %}
+        <div class="stat-sub">{{ days_logged }} day{{ 's' if days_logged != 1 }} recorded</div>
+        {% else %}
+        <div class="stat-sub">No readings logged yet</div>
+        {% endif %}
+    </div>
+
+    {# Card 3: Active Appliances #}
+    <div class="stat-card navy">
+        <div class="stat-icon">
+            <i class="fa-solid fa-plug"
+               aria-hidden="true"
+               style="color: rgb(99, 230, 190);
+                      font-size: 19px;"></i>
+        </div>
+        <div class="stat-value">{{ appliance_count }}</div>
+        <div class="stat-label">Active Appliances</div>
+        {% if appliance_count == 0 %}
+        <div class="stat-sub">
+            <a href="{{ url_for('appliances.list_appliances') }}"
+               style="color:var(--green); font-weight:600; font-size:12px;">
+                + Add appliances ->
+            </a>
+        </div>
+        {% else %}
+        <div class="stat-sub">Tracked and costed</div>
+        {% endif %}
+    </div>
+
+    {# Card 4: Top Cost Appliance #}
+    <div class="stat-card amber">
+        <div class="stat-icon">
+            <i class="fa-solid fa-fire"
+               aria-hidden="true"
+               style="color: #e07b2a;
+                      font-size: 19px;"></i>
+        </div>
+        <div class="stat-value{{ top_appliance_value_class }}">
+            {% if top_appliance %}
+                {{ top_appliance.name | truncate(18, True, '...') }}
+            {% else %}
+                -
+            {% endif %}
+        </div>
+        <div class="stat-label">Top Cost Appliance</div>
+        {% if top_appliance %}
+        <div class="stat-sub">~{{ top_appliance.monthly_cost | naira }}/month</div>
+        {% else %}
+        <div class="stat-sub">Add appliances to find out</div>
+        {% endif %}
+    </div>
+</div>
+
+{# Bottom section #}
+<div class="dashboard-bottom-grid" style="display: grid; grid-template-columns: 1fr 360px; gap: 24px; align-items: start;">
+
+    {# Left - recent activity #}
+    <div class="em-card">
+        <div class="em-card-header">
+            <span class="em-card-header-title">Recent Consumption Logs</span>
+        </div>
+        {% if recent_logs %}
+        <div class="em-card-body" style="padding: 0;">
+            <table class="em-table">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>kWh</th>
+                        <th>Source</th>
+                        <th>Cost</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for log in recent_logs %}
+                    {% set source_color = 'var(--navy-mid)' if log.source|lower == 'grid' else 'var(--amber)' %}
+                    <tr>
+                        <td>{{ log.date.strftime('%d %b, %Y') }}</td>
+                        <td>{{ '%.2f'|format(log.kwh) }}</td>
+                        <td>
+                            <span style="display:inline-flex; align-items:center; gap:6px; font-size:12px; font-weight:600; color: {{ source_color }};">
+                                <i class="fa-solid fa-plug" style="font-size: 10px;"></i> {{ log.source }}
+                            </span>
+                        </td>
+                        <td class="fw-semibold">{{ log.cost | naira }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <div class="empty-state-icon">
+                <i class="fa-solid fa-clipboard-list"
+                   aria-hidden="true"
+                   style="color: var(--green);
+                          font-size: 44px;
+                          opacity: 0.85;"></i>
+            </div>
+            <div class="empty-state-title">No readings yet</div>
+            <p class="empty-state-text">
+                Log your daily meter readings or estimated kWh usage.
+                Even 7 days of data is enough for a bill prediction.
+            </p>
+            <a href="{{ url_for('consumption.log_consumption') }}" class="btn-em-primary">
+                <i class="fa-solid fa-pen-to-square me-2"></i> Log First Reading
+            </a>
+        </div>
+        {% endif %}
+    </div>
+
+    {# Right - quick actions and tariff info #}
+    <div>
+        <div class="em-card mb-0" style="margin-bottom: 20px;">
+            <div class="em-card-header">
+                <span class="em-card-header-title">Your Tariff</span>
+                <span style="display:inline-flex; align-items:center; gap:6px; font-size:11px; color:var(--green); font-weight:600;">
+                    <span style="width:7px; height:7px; background:var(--green); border-radius:50%; display:inline-block; "></span>
+                    LIVE RATES
+                </span>
+            </div>
+            <div class="em-card-body">
+                {% if current_user.tariff_band %}
+                <div class="tariff-display">
+                    <div class="tariff-band-badge">Band {{ current_user.tariff_band.band }}</div>
+                    <div class="tariff-rate">
+                        {{ current_user.tariff_band.rate_per_kwh | naira }}<span>/kWh</span>
+                    </div>
+                    <div class="tariff-hours">{{ current_user.tariff_band.service_hours }}</div>
+                    {% if current_user.tariff_band.band == 'A' %}
+                    <div class="tariff-note">Cost-reflective - reviewed monthly by NERC</div>
+                    {% else %}
+                    <div class="tariff-note">Govt-subsidised - frozen since Dec 2022</div>
+                    {% endif %}
+                </div>
+                <div style="font-size: 11px; color: var(--text-muted); margin-top: 12px;">
+                    Source: NERC MYTO November 2025
+                </div>
+                {% else %}
+                <p style="color: var(--text-muted); font-size:13px;">
+                    No tariff band set.
+                </p>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="em-card">
+            <div class="em-card-header">
+                <span class="em-card-header-title">Quick Actions</span>
+            </div>
+            <div class="em-card-body" style="display: flex; flex-direction: column; gap: 10px;">
+                <a href="{{ url_for('appliances.list_appliances') }}" class="quick-action-btn">
+                    <i class="fa-solid fa-plug"></i>
+                    <span>Manage Appliances</span>
+                    <i class="fa-solid fa-chevron-right ms-auto"></i>
+                </a>
+                <a href="{{ url_for('optimizer.tips') }}" class="quick-action-btn">
+                    <i class="fa-solid fa-wand-magic-sparkles"></i>
+                    <span>Savings Tips</span>
+                    <i class="fa-solid fa-chevron-right ms-auto"></i>
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.seasonal-flag {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 18px;
+    border-radius: var(--radius);
+    font-size: 13.5px;
+    font-weight: 500;
+}
+.seasonal-warning {
+    background: #fef3c7;
+    color: #92400e;
+    border-left: 4px solid var(--amber);
+}
+.seasonal-info {
+    background: #eff8fc;
+    color: #075985;
+    border-left: 4px solid #0ea5e9;
+    border-radius: var(--radius);
+    font-weight: 500;
+}
+.seasonal-icon { font-size: 20px; flex-shrink: 0; }
+
+.onboarding-banner {
+    background: var(--navy);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    position: relative;
+}
+.onboarding-inner {
+    padding: 32px 36px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
+    position: relative;
+    z-index: 1;
+}
+.onboarding-title {
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-size: 22px;
+    font-weight: 800;
+    color: white;
+    margin-bottom: 8px;
+}
+.onboarding-sub {
+    color: rgba(255,255,255,0.7);
+    font-size: 14px;
+    margin-bottom: 24px;
+}
+.onboarding-steps {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+.onboarding-step {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+.step-num {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: var(--green);
+    color: white;
+    font-weight: 800;
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+}
+.step-text { display: flex; flex-direction: column; gap: 1px; }
+.step-text strong { color: white; font-size: 13.5px; }
+.step-text span { color: rgba(255,255,255,0.55); font-size: 12px; }
+.stat-sub {
+    font-size: 11.5px;
+    color: var(--text-muted);
+    margin-top: 5px;
+}
+
+/* Stat Card Enhancements */
+.stat-card {
+    background: var(--surface);
+    border-radius: var(--radius-lg);
+    padding: 22px;
+    border: 1px solid var(--border);
+    box-shadow: none;
+    position: relative;
+    overflow: hidden;
+    cursor: default;
+}
+.stat-card:hover { box-shadow: none; }
+
+
+.tariff-display { text-align: center; padding: 8px 0; }
+.tariff-band-badge {
+    display: inline-block;
+    background: var(--navy);
+    color: white;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-weight: 800;
+    font-size: 13px;
+    padding: 4px 14px;
+    border-radius: 20px;
+    margin-bottom: 10px;
+}
+.tariff-rate {
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-size: 32px;
+    font-weight: 800;
+    color: var(--navy);
+    line-height: 1;
+    text-decoration: none !important;
+}
+
+.tariff-rate::first-letter {
+    font-family: 'DM Sans', sans-serif;
+    font-weight: 700;
+}
+.tariff-rate span { font-size: 14px; font-weight: 500; color: var(--text-muted); }
+.tariff-hours { font-size: 13px; color: var(--text-muted); margin-top: 6px; }
+.tariff-note { font-size: 11.5px; color: var(--green); margin-top: 5px; font-weight: 600; }
+
+.quick-action-btn {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    padding: 11px 14px;
+    border-radius: var(--radius);
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-left: 3px solid transparent;
+    color: var(--text);
+    text-decoration: none;
+    font-size: 13.5px;
+    font-weight: 500;
+    transition: border-color 0.15s, background 0.15s;
+}
+.quick-action-btn:hover {
+    border-left-color: var(--green);
+    background: #ecfdf5;
+    color: var(--navy);
+
+}
+.quick-action-btn i:first-child {
+    color: var(--green);
+    font-size: 15px;
+    width: 18px;
+    text-align: center;
+}
+
+.budget-fill.budget-green { background: var(--green); }
+.budget-fill.budget-amber { background: var(--amber); }
+.budget-fill.budget-red { background: #dc3545; }
+
+@media (max-width: 900px) {
+    .dashboard-bottom-grid {
+        grid-template-columns: 1fr !important;
+    }
+    .onboarding-illustration { display: none; }
+}
+
+.stat-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 18px;
+    margin-bottom: 28px;
+}
+
+.dashboard-financial-grid { grid-template-columns:minmax(0, .92fr) minmax(0, 1.08fr); gap:14px; margin-bottom:14px; }
+.dashboard-financial-grid .stat-card { grid-column:auto; grid-row:auto; padding:20px 22px; }
+.dashboard-financial-grid .stat-value { font-size:32px; }
+.dashboard-financial-grid .stat-label { color:var(--text-mid); }
+.dashboard-financial-grid .stat-icon { width:36px; height:36px; margin-bottom:10px; font-size:17px; }
+.dashboard-financial-grid .stat-card::before { height:3px; }
+.dashboard-financial-grid .stat-card-spend { background:var(--navy); border-color:var(--navy); }
+.dashboard-financial-grid .stat-card-spend .stat-value { color:#fff; font-size:36px; }
+.dashboard-financial-grid .stat-card-spend .stat-label { color:rgba(255,255,255,.82); }
+.dashboard-financial-grid .stat-card-spend .stat-sub { color:rgba(255,255,255,.58); }
+.dashboard-financial-grid .stat-card-spend .stat-icon { background:rgba(255,255,255,.1); }
+.dashboard-budget-row { margin-left:0; margin-right:0; }
+.dashboard-budget-row > .col-12 { padding:0; }
+.dashboard-budget-card { display:grid; grid-template-columns:190px minmax(0,1fr); align-items:center; margin-bottom:20px; box-shadow:none; }
+.dashboard-budget-card .em-card-header { border:0; padding:18px 20px; }
+.dashboard-budget-card .em-card-body { padding:16px 20px; border-left:1px solid var(--border); }
+.dashboard-budget-card .em-card-body > div:first-child { margin-bottom:6px !important; }
+.dashboard-supporting-grid { grid-template-columns:repeat(3,minmax(0,1fr)); gap:14px; }
+.dashboard-supporting-grid .stat-card { padding:16px; }
+
+@media (max-width: 768px) {
+    .dashboard-financial-grid { grid-template-columns:1fr; gap:12px; margin-bottom:16px; }
+    .dashboard-budget-card { grid-template-columns:1fr; }
+    .dashboard-budget-card .em-card-header { padding:16px 16px 4px; }
+    .dashboard-budget-card .em-card-body { border-left:0; padding:8px 16px 16px; }
+    .dashboard-supporting-grid { grid-template-columns:1fr 1fr; gap:12px; margin-bottom:20px; }
+    .dashboard-supporting-grid .stat-card:last-child { grid-column:1 / -1; }
+    .dashboard-financial-grid .stat-value { font-size:28px; }
+    .dashboard-financial-grid .stat-card-spend .stat-value { font-size:30px; }
+    .dashboard-supporting-grid .stat-label { font-size:10.5px; letter-spacing:.35px; }
+    .stat-card {
+        padding: 16px;
+    }
+    .stat-value {
+        font-size: 22px;
+    }
+    .stat-icon {
+        width: 36px;
+        height: 36px;
+        font-size: 16px;
+        margin-bottom: 10px;
+    }
+    .onboarding-inner {
+        padding: 24px 20px;
+        flex-direction: column;
+        gap: 20px;
+    }
+    .onboarding-title {
+        font-size: 20px;
+    }
+    .onboarding-sub {
+        font-size: 13px;
+    }
+    .onboarding-steps {
+        gap: 12px;
+    }
+    .step-text strong {
+        font-size: 13px;
+    }
+    .seasonal-flag {
+        font-size: 12.5px;
+        padding: 10px 14px;
+    }
+}
+</style>
+{% endblock %}

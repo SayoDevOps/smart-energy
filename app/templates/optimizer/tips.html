@@ -1,0 +1,184 @@
+{% extends "base.html" %}
+
+{% block title %}Savings Optimizer - Smart Energy Monitor{% endblock %}
+{% block page_title %}Savings Optimizer{% endblock %}
+
+{% block content %}
+
+<div class="optimizer-page">
+
+    {% if tips %}
+    <!-- Summary Banner -->
+    <div class="em-card" style="margin-bottom: 24px; border-left: 4px solid var(--green);">
+        <div class="em-card-body" style="display: flex; align-items: center; gap: 16px;">
+            <i class="fa-solid fa-sack-dollar" style="color: var(--green); font-size: 28px;"></i>
+            <div>
+                <div style="font-family: 'Plus Jakarta Sans', sans-serif; font-size: 18px; font-weight: 700; color: var(--navy);">
+                    You could save up to {{ total_saving | naira }}/month
+                </div>
+                <div style="font-size: 13px; color: var(--text-muted);">
+                    by applying all {{ tips|length }} tips below{% if applied_count > 0 %} ({{ applied_count }} already applied){% endif %}.
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tips Grid -->
+    <div class="tips-grid">
+        {% for tip in tips %}
+        <div class="tip-card priority-{{ tip.priority }}">
+            <div class="tip-card-header">
+                <div class="tip-appliance-name">
+                    <i class="fa-solid {{ tip.icon }}"></i>
+                    {{ tip.appliance_name }}
+                </div>
+                <span class="badge-{{ 'red' if tip.priority == 'high' else 'amber' if tip.priority == 'medium' else 'green' }}">
+                    {{ tip.priority | title }}
+                </span>
+            </div>
+            <div class="tip-text">
+                {{ tip.tip_text }}
+            </div>
+            <div class="tip-usage-basis">
+                <i class="fa-solid {{ 'fa-chart-line' if tip.usage_source == 'actual' else 'fa-calculator' }}"></i>
+                {{ tip.usage_basis }} · {{ tip.monthly_kwh }} kWh
+            </div>
+            <div class="tip-saving-row">
+                <div>
+                    <div class="tip-saving-label">Potential saving</div>
+                    <div class="tip-saving-amount">{{ tip.potential_saving | naira }}/month</div>
+                </div>
+                <span class="badge-gray">{{ tip.category | title }}</span>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    {% else %}
+    <!-- Empty State -->
+    <div class="em-card">
+        <div class="em-card-body" style="text-align: center; padding: 56px 24px;">
+            <i class="fa-solid fa-plug-circle-check" style="color: var(--green); font-size: 44px; opacity: 0.7; margin-bottom: 16px;"></i>
+            <div class="empty-state-title">No tips yet</div>
+            <p class="empty-state-text">Add your appliances with accurate wattage and daily hours to unlock personalised savings recommendations.</p>
+            <a href="{{ url_for('appliances.list_appliances') }}" class="btn-em-primary" style="display: inline-flex;">
+                <i class="fa-solid fa-plug"></i> Add Appliances
+            </a>
+        </div>
+    </div>
+    {% endif %}
+
+</div>
+
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .tips-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 18px;
+        margin-top: 20px;
+    }
+
+    .tip-card {
+        background: var(--surface);
+        border-radius: var(--radius-lg);
+        border: 1px solid var(--border);
+        border-left: 4px solid var(--green);
+        padding: 20px;
+        box-shadow: none;
+    }
+
+    .tip-card:hover { border-color: #cbd5e1; }
+
+    .tip-card.priority-high {
+        border-left-color: #dc3545;
+    }
+
+    .tip-card.priority-medium {
+        border-left-color: var(--amber);
+    }
+
+    .tip-card.priority-low {
+        border-left-color: var(--green);
+    }
+
+    .tip-card-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        margin-bottom: 12px;
+        flex-wrap: wrap;
+    }
+
+    .tip-appliance-name {
+        font-family: 'Plus Jakarta Sans', sans-serif;
+        font-weight: 700;
+        font-size: 15px;
+        color: var(--navy);
+        display: flex;
+        align-items: center;
+        gap: 9px;
+    }
+
+    .tip-appliance-name i {
+        color: var(--green);
+        font-size: 16px;
+    }
+
+    .tip-text {
+        font-size: 13.5px;
+        color: var(--text-mid);
+        line-height: 1.65;
+        margin-bottom: 14px;
+    }
+
+    .tip-usage-basis {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        margin-bottom: 14px;
+        color: var(--text-muted);
+        font-size: 11px;
+    }
+
+    .tip-usage-basis i { color: var(--green); }
+
+    .tip-saving-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding-top: 12px;
+        border-top: 1px solid var(--border);
+        gap: 10px;
+        flex-wrap: wrap;
+    }
+
+    .tip-saving-amount {
+        font-family: 'Plus Jakarta Sans', sans-serif;
+        font-size: 18px;
+        font-weight: 800;
+        color: var(--green);
+    }
+
+    .tip-saving-label {
+        font-size: 11px;
+        color: var(--text-muted);
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.4px;
+    }
+
+    @media (max-width: 768px) {
+        .tips-grid {
+            grid-template-columns: 1fr;
+            gap: 14px;
+        }
+        .tip-saving-amount {
+            font-size: 16px;
+        }
+    }
+</style>
+{% endblock %}

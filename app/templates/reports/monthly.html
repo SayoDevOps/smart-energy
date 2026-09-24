@@ -1,0 +1,153 @@
+{% extends "base.html" %}
+
+{% block title %}Monthly Energy Report - Smart Energy Monitor{% endblock %}
+{% block page_title %}Monthly Energy Report{% endblock %}
+{% block page_kicker %}<span class="app-page-kicker">Statement summary</span>{% endblock %}
+{% block page_subtitle %}<p class="app-page-subtitle">{{ month_name }} {{ year }} <span aria-hidden="true">·</span> {{ current_user.full_name }} <span aria-hidden="true">·</span> Band {{ tariff_band.band if tariff_band else '--' }}</p>{% endblock %}
+{% block page_actions %}<div class="app-page-actions"><button type="button" class="btn-em-primary report-print-button" onclick="window.print()"><i class="fa-solid fa-print" aria-hidden="true"></i> Print Report</button></div>{% endblock %}
+
+{% block content %}
+<div class="report-page">
+    <div class="report-print-header">
+        <div class="report-print-brand">ENERGY CONSUMPTION REPORT</div>
+        <div>{{ current_user.full_name }} | {{ month_name }} {{ year }} | Band {{ tariff_band.band if tariff_band else '--' }}</div>
+    </div>
+
+    <section class="report-summary-grid" aria-label="Energy summary">
+        <article class="report-summary-panel grid-panel">
+            <div class="report-panel-heading"><span class="report-icon"><i class="fa-solid fa-plug-circle-bolt"></i></span><span>GRID</span></div>
+            <div class="report-stat-value">{{ total_grid_kwh }} <small>kWh</small></div>
+            <div class="report-stat-cost">{{ total_grid_cost | naira }}</div>
+            <div class="report-stat-note">Billed at Band {{ tariff_band.band if tariff_band else '--' }} rate</div>
+        </article>
+        <article class="report-summary-panel generator-panel">
+            <div class="report-panel-heading"><span class="report-icon"><i class="fa-solid fa-gears"></i></span><span>GENERATOR</span></div>
+            <div class="report-stat-value">{{ total_generator_hours }} <small>hrs</small></div>
+            <div class="report-stat-cost">{{ total_fuel_cost | naira }} <small>fuel</small></div>
+            <div class="report-stat-note">Based on logged generator activity</div>
+        </article>
+        <article class="report-summary-panel total-panel">
+            <div class="report-panel-heading"><span class="report-icon"><i class="fa-solid fa-receipt"></i></span><span>TOTAL ENERGY SPEND</span></div>
+            <div class="report-total-amount">{{ combined_total_spend | naira }}</div>
+            <div class="report-total-caption">Grid electricity plus generator fuel</div>
+        </article>
+    </section>
+
+    <div class="report-grid report-row-appliances">
+        <section class="report-section report-appliances-section">
+            <div class="report-section-heading"><div><span class="report-section-kicker">Usage profile</span><h2>Top appliances</h2></div><i class="fa-solid fa-ranking-star"></i></div>
+            {% if top_appliances %}
+            <div class="report-table-wrap">
+                <table class="report-table">
+                    <thead><tr><th>Appliance</th><th>Category</th><th class="text-end">Monthly Cost</th></tr></thead>
+                    <tbody>{% for appliance in top_appliances %}<tr><td><strong>{{ appliance.name }}</strong><span class="report-wattage">{{ appliance.wattage }}W</span></td><td>{{ appliance.category | title }}</td><td class="text-end report-table-cost">{{ appliance.monthly_cost | naira }}</td></tr>{% endfor %}</tbody>
+                </table>
+            </div>
+            {% else %}<div class="report-empty-state"><i class="fa-solid fa-plug-circle-xmark"></i><span>No appliances have been added yet.</span></div>{% endif %}
+        </section>
+
+        <section class="report-section report-savings-section">
+            <div class="report-section-heading"><div><span class="report-section-kicker">Efficiency</span><h2>Savings</h2></div><i class="fa-solid fa-piggy-bank"></i></div>
+            <div class="report-savings-value">{{ optimization_savings | naira }}</div>
+            <div class="report-savings-label">saved through applied recommendations</div>
+            <div class="report-tip-count"><strong>{{ optimization_applied_count }}</strong> tips applied <span>of {{ optimization_total_count }} generated</span></div>
+        </section>
+    </div>
+
+    <div class="report-grid report-row-details">
+        <section class="report-section report-comparison-section">
+            <div class="report-section-heading"><div><span class="report-section-kicker">Spend movement</span><h2>Compared with last month</h2></div><i class="fa-solid fa-chart-line"></i></div>
+            {% if comparison_status == 'none' %}<div class="report-comparison-value">--</div><div class="report-comparison-label"><i class="fa-solid fa-minus"></i> No previous-month data</div>{% elif comparison_status == 'higher' %}<div class="report-comparison-value higher">{{ percentage_change_magnitude }}%</div><div class="report-comparison-label higher"><i class="fa-solid fa-arrow-trend-up"></i> Higher than last month</div>{% else %}<div class="report-comparison-value lower">{{ percentage_change_magnitude }}%</div><div class="report-comparison-label lower"><i class="fa-solid fa-arrow-trend-down"></i> Lower than last month</div>{% endif %}
+        </section>
+        <section class="report-section report-tariff-section">
+            <div class="report-section-heading"><div><span class="report-section-kicker">Billing information</span><h2>Tariff details</h2></div><i class="fa-solid fa-receipt"></i></div>
+            <div class="report-tariff-grid"><div><span>Tariff Band</span><strong>Band {{ tariff_band.band if tariff_band else '--' }}</strong></div><div><span>Rate per kWh</span><strong>{{ tariff_rate | naira }}</strong></div><div><span>Service hours</span><strong>{{ tariff_band.service_hours if tariff_band else '--' }}</strong></div></div>
+        </section>
+    </div>
+
+    <footer class="report-footer"><div>Source: NERC MYTO November 2025 (effective Dec 7, 2025)</div><div>Generated by Smart Energy Monitor</div></footer>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .report-page { max-width: 1180px; margin: 0 auto; }
+    .report-section-kicker { color:var(--green); font-size:11px; font-weight:700; letter-spacing:1px; text-transform:uppercase; }
+    .report-print-header { display:none; }
+    .report-summary-grid, .report-grid { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:16px; align-items:stretch; }
+    .report-summary-grid { grid-template-columns:repeat(3, minmax(0, 1fr)); margin-bottom:16px; }
+    .report-row-appliances { margin-bottom:16px; }
+    .report-summary-panel, .report-section { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-lg); box-shadow:var(--shadow-sm); }
+    .report-summary-panel { min-width:0; padding:20px; border-top:4px solid var(--green); }
+    .generator-panel { border-top-color:var(--amber); }
+    .total-panel { background:var(--navy); border-color:var(--navy); color:white; }
+    .total-panel .report-panel-heading, .total-panel .report-icon { color:white; }
+    .report-total-amount { margin-top:23px; font-family:'Plus Jakarta Sans',sans-serif; font-size:30px; font-weight:800; line-height:1.15; white-space:nowrap; }
+    .report-total-caption { margin-top:9px; color:rgba(255,255,255,.76); font-size:12px; }
+    .report-panel-heading, .report-section-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+    .report-panel-heading { color:var(--text-muted); font-size:11px; font-weight:800; letter-spacing:1.2px; }
+    .report-icon { color:var(--green); font-size:17px; margin-right:8px; }
+    .generator-panel .report-icon { color:var(--amber); }
+    .report-stat-value { margin-top:23px; font-family:'Plus Jakarta Sans',sans-serif; font-size:30px; font-weight:800; color:var(--navy); line-height:1.15; }
+    .report-stat-value small, .report-stat-cost small { font-family:'DM Sans',sans-serif; font-size:13px; font-weight:600; color:var(--text-muted); }
+    .report-stat-cost { margin-top:2px; color:var(--navy); font-family:'Plus Jakarta Sans',sans-serif; font-size:20px; font-weight:700; }
+    .report-stat-note { margin-top:10px; color:var(--text-muted); font-size:12px; }
+    .report-section { min-width:0; padding:20px; }
+    .report-section-heading { margin-bottom:18px; }
+    .report-section-heading h2 { margin:3px 0 0; font-size:17px; color:var(--navy); }
+    .report-section-heading > i { color:var(--green); font-size:19px; }
+    .report-table { width:100%; table-layout:fixed; border-collapse:collapse; font-size:13px; }
+    .report-table th { padding:0 0 10px; color:var(--text-muted); border-bottom:1px solid var(--border); font-size:10px; letter-spacing:.8px; text-transform:uppercase; }
+    .report-table td { padding:14px 0; color:var(--text-mid); border-bottom:1px solid var(--border); vertical-align:middle; }
+    .report-table tbody tr:last-child td { border-bottom:0; padding-bottom:0; }
+    .report-table td:first-child { color:var(--navy); }
+    .report-table th:first-child { width:42%; }
+    .report-table th:nth-child(2) { width:28%; }
+    .report-table td strong { overflow-wrap:anywhere; }
+    .report-wattage { display:block; color:var(--text-muted); font-size:11px; margin-top:2px; }
+    .report-table-cost { color:var(--navy) !important; font-weight:700; white-space:nowrap; }
+    .text-end { text-align:right; }
+    .report-empty-state { display:flex; align-items:center; gap:10px; color:var(--text-muted); padding:18px 0 4px; font-size:13px; }
+    .report-empty-state i { color:var(--green); font-size:20px; }
+    .report-savings-value, .report-comparison-value { font-family:'Plus Jakarta Sans',sans-serif; font-size:27px; font-weight:800; color:var(--green); }
+    .report-savings-label, .report-comparison-label { color:var(--text-mid); font-size:12px; }
+    .report-tip-count { margin-top:17px; padding-top:13px; border-top:1px solid var(--border); color:var(--navy); font-size:13px; }
+    .report-tip-count span { color:var(--text-muted); }
+    .report-comparison-value { color:var(--navy); margin-top:4px; }
+    .report-comparison-value.higher, .report-comparison-label.higher { color:#c2571c; }
+    .report-comparison-value.lower, .report-comparison-label.lower { color:var(--green); }
+    .report-tariff-grid { display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:12px; }
+    .report-tariff-grid div { padding:13px 15px; background:var(--surface-2); border:1px solid var(--border); border-radius:var(--radius); }
+    .report-tariff-grid span { display:block; color:var(--text-muted); font-size:11px; }
+    .report-tariff-grid strong { display:block; margin-top:3px; color:var(--navy); font-family:'Plus Jakarta Sans',sans-serif; font-size:14px; }
+    .report-footer { display:flex; justify-content:space-between; gap:15px; padding:16px 0 4px; color:var(--text-muted); font-size:11px; }
+    @media (max-width:768px) {
+        .app-page-header { align-items:flex-start; }
+        .report-print-button { justify-content:center; }
+        .report-summary-grid, .report-grid { grid-template-columns:1fr; }
+        .report-summary-grid { margin-bottom:14px; }
+        .report-total-amount { font-size:27px; }
+        .report-tariff-grid { grid-template-columns:1fr; }
+        .report-table-wrap { overflow:visible; }
+        .report-footer { flex-direction:column; }
+    }
+    @media print {
+        body { background:#fff !important; color:#111; }
+        .em-sidebar, .em-topbar, .em-mobile-topbar, .em-mobile-drawer, .em-mobile-overlay, .app-page-header, .report-print-button, button, .btn-em-primary, nav { display:none !important; }
+        .em-main { margin:0 !important; padding:0 !important; min-height:0 !important; }
+        .report-page { max-width:none; }
+        .report-print-header { display:block; padding-bottom:14px; margin-bottom:16px; border-bottom:2px solid #0f2744; color:#0f2744; font-size:11px; text-transform:uppercase; letter-spacing:.5px; }
+        .report-print-brand { margin-bottom:4px; font-family:'Plus Jakarta Sans',sans-serif; font-size:19px; font-weight:800; letter-spacing:1.2px; }
+        .report-summary-grid, .report-grid { gap:10px; }
+        .report-summary-panel, .report-section { box-shadow:none; border-radius:0; }
+        .report-summary-panel { padding:13px 15px; }
+        .report-stat-value { margin-top:10px; font-size:24px; }
+        .report-total-amount { margin-top:10px; font-size:24px; }
+        .report-section { padding:15px; }
+        .report-section-heading { margin-bottom:10px; }
+        .report-table td { padding:9px 0; }
+        .report-footer { display:flex; border-top:1px solid #d9d9d9; margin-top:14px; padding-top:10px; }
+        .report-tariff-section, .report-appliances-section, .report-savings-section, .report-comparison-section { break-inside:avoid; }
+    }
+</style>
+{% endblock %}

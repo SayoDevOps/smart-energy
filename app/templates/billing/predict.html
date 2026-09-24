@@ -1,0 +1,329 @@
+{% extends "base.html" %}
+
+{% block title %}Bill Prediction - Smart Energy Monitor{% endblock %}
+{% block page_title %}Bill Prediction{% endblock %}
+{% block page_subtitle %}<p class="app-page-subtitle">{{ month_name }} forecast based on your consumption logs</p>{% endblock %}
+
+{% block content %}
+
+<div>
+
+    <!-- Anomaly Alert -->
+    {% if anomaly.has_anomaly %}
+    <div class="em-card anomaly-alert" style="margin-bottom: 20px; border-left: 4px solid var(--amber);">
+        <div class="em-card-body" style="display: flex; align-items: center; gap: 12px;">
+            <i class="fa-solid fa-triangle-exclamation" style="color: var(--amber); font-size: 20px;"></i>
+            <div>
+                <strong style="color: var(--amber);">
+                    {% if anomaly.anomaly_type == 'spike' %}Usage Spike Detected{% else %}Rising Trend Detected{% endif %}
+                </strong>
+                <p style="margin: 4px 0 0; font-size: 13px; color: var(--text-mid);">{{ anomaly.message }}</p>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Top Row: Prediction + Confidence -->
+    <div class="predict-row-1">
+        
+        <!-- Main Prediction Card -->
+        <div class="em-card">
+            <div class="em-card-header">
+                <span class="em-card-header-title">
+                    <i class="fa-solid fa-file-invoice-dollar" style="color: var(--green); margin-right: 8px;"></i>
+                    This Month's Forecast
+                </span>
+            </div>
+            <div class="em-card-body">
+                {% if prediction.error %}
+                <!-- Empty State -->
+                <div style="text-align: center; padding: 40px 20px;">
+                    <i class="fa-solid fa-hourglass-half" style="color: var(--green); font-size: 40px; opacity: 0.7; margin-bottom: 16px;"></i>
+                    <p style="color: var(--text-mid); font-size: 14px; margin-bottom: 16px;">{{ prediction.error }}</p>
+                    <a href="{{ url_for('consumption.log_consumption') }}" class="btn-em-primary" style="display: inline-flex;">
+                        <i class="fa-solid fa-pencil"></i> Log Today's Reading
+                    </a>
+                </div>
+                {% else %}
+                <!-- Prediction Display -->
+                <div style="margin-bottom: 24px;">
+                    <div style="font-size: 12px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 8px;">
+                        Predicted Bill (excl. VAT)
+                    </div>
+                    <div class="predicted-amount" style="font-family: 'Plus Jakarta Sans', sans-serif; font-size: 44px; font-weight: 800; color: var(--navy); line-height: 1.2;">
+                        {{ prediction.predicted_bill | naira }}
+                    </div>
+                    <div style="font-size: 13px; color: var(--text-mid); margin-top: 4px;">
+                        Band {{ current_user.tariff_band.band if current_user.tariff_band else '--' }} @ {{ tariff_rate | naira }}/kWh
+                    </div>
+                </div>
+
+                <div style="border-top: 1px solid var(--border); padding-top: 16px; margin-bottom: 16px;">
+                    <div style="font-size: 12px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 8px;">
+                        With 7.5% VAT (FIRS mandatory)
+                    </div>
+                    <div style="font-family: 'Plus Jakarta Sans', sans-serif; font-size: 24px; font-weight: 700; color: var(--navy);">
+                        {{ prediction.predicted_bill_with_vat | naira }}
+                    </div>
+                </div>
+
+                <div style="display: flex; gap: 24px; font-size: 13px; color: var(--text-mid);">
+                    <div>
+                        <strong style="color: var(--navy);">{{ prediction.days_logged }}</strong> days of data
+                    </div>
+                    <div>
+                        Avg daily: <strong style="color: var(--navy);">{{ prediction.avg_daily_kwh }}</strong> kWh
+                    </div>
+                    <div>
+                        Projected: <strong style="color: var(--navy);">{{ prediction.projected_kwh }}</strong> kWh
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Confidence Card -->
+        <div class="em-card">
+            <div class="em-card-header">
+                <span class="em-card-header-title">
+                    <i class="fa-solid fa-gauge-high" style="color: var(--green); margin-right: 8px;"></i>
+                    Forecast Confidence
+                </span>
+            </div>
+            <div class="em-card-body">
+                {% if prediction.error %}
+                <div style="text-align: center; padding: 30px 10px; color: var(--text-muted); font-size: 13px;">
+                    Log data to see confidence
+                </div>
+                {% else %}
+                <div style="margin-bottom: 16px;">
+                    <div class="confidence-bar" style="height: 10px; border-radius: 10px; background: var(--border); overflow: hidden;">
+                        <div class="confidence-fill" style="height: 100%; border-radius: 10px; background: var(--green); width: {{ prediction.confidence_level }}%;"></div>
+                    </div>
+                </div>
+                <div style="text-align: center; margin-bottom: 16px;">
+                    <div style="font-family: 'Plus Jakarta Sans', sans-serif; font-size: 20px; font-weight: 700; color: var(--navy);">{{ prediction.confidence }}</div>
+                    <div style="font-size: 12px; color: var(--text-muted);">{{ prediction.confidence_level }}% confidence</div>
+                </div>
+                <div style="font-size: 11px; color: var(--text-muted); line-height: 1.6;">
+                    <div>3–6 days → Low</div>
+                    <div>7–14 days → Moderate</div>
+                    <div>15–21 days → High</div>
+                    <div>22+ days → Very High</div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Middle Row: Breakdown + Enter Actual -->
+    <div class="predict-row-2">
+        
+        <!-- Cost Breakdown -->
+        <div class="em-card">
+            <div class="em-card-header">
+                <span class="em-card-header-title">
+                    <i class="fa-solid fa-chart-pie" style="color: var(--green); margin-right: 8px;"></i>
+                    Cost Breakdown
+                </span>
+            </div>
+            <div class="em-card-body">
+                {% if prediction.error %}
+                <div style="text-align: center; color: var(--text-muted); font-size: 13px; padding: 20px;">
+                    Log data to see breakdown
+                </div>
+                {% else %}
+                <table style="width: 100%; font-size: 14px;">
+                    <tr style="border-bottom: 1px solid var(--border);">
+                        <td style="padding: 10px 0; color: var(--text-mid);">Base cost</td>
+                        <td style="padding: 10px 0; text-align: right; font-weight: 600; color: var(--navy);">{{ prediction.predicted_bill | naira }}</td>
+                    </tr>
+                    <tr style="border-bottom: 1px solid var(--border);">
+                        <td style="padding: 10px 0; color: var(--text-mid);">VAT (7.5%)</td>
+                        <td style="padding: 10px 0; text-align: right; font-weight: 600; color: var(--navy);">{{ (prediction.predicted_bill_with_vat - prediction.predicted_bill) | naira }}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 10px 0; color: var(--text-mid); font-weight: 600;">Total (estimated)</td>
+                        <td style="padding: 10px 0; text-align: right; font-weight: 800; color: var(--navy); font-family: 'Plus Jakarta Sans', sans-serif;">{{ prediction.predicted_bill_with_vat | naira }}</td>
+                    </tr>
+                </table>
+
+                <div style="margin-top: 16px; padding: 12px; border-radius: var(--radius); font-size: 12px; {% if prediction.predicted_bill > 30000 %}background: rgba(255, 193, 7, 0.1); color: var(--amber);{% else %}background: rgba(25, 163, 94, 0.1); color: var(--green);{% endif %}">
+                    {% if prediction.predicted_bill > 30000 %}
+                    <i class="fa-solid fa-triangle-exclamation"></i> High bill predicted. Check your optimizer for savings tips.
+                    {% else %}
+                    <i class="fa-solid fa-check-circle"></i> Your consumption looks efficient this month.
+                    {% endif %}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Enter Actual Bill -->
+        <div class="em-card">
+            <div class="em-card-header">
+                <span class="em-card-header-title">
+                    <i class="fa-solid fa-receipt" style="color: var(--green); margin-right: 8px;"></i>
+                    Record Actual Bill
+                </span>
+            </div>
+            <div class="em-card-body">
+                <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 16px; line-height: 1.5;">
+                    When your NERC bill arrives, enter the actual amount here to track prediction accuracy.
+                </p>
+                <form method="POST" action="{{ url_for('billing.save_actual_bill') }}">
+                    <div class="mb-3">
+                        <label class="form-label" style="font-size: 12px;">Month</label>
+                        <select name="month" class="form-select" style="font-size: 13px;">
+                            {% for m in range(1, 13) %}
+                            <option value="{{ m }}" {% if m == date.today().month %}selected{% endif %}>
+                                {{ ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][m-1] }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label" style="font-size: 12px;">Year</label>
+                        <input type="number" name="year" class="form-control" value="{{ date.today().year }}" style="font-size: 13px;">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label" style="font-size: 12px;">Actual Amount (&#8358;)</label>
+                        <input type="number" name="actual_amount" class="form-control" min="0" step="50" placeholder="e.g. 15000" style="font-size: 13px;" required>
+                    </div>
+                    <button type="submit" class="btn-em-primary w-100" style="justify-content: center; font-size: 13px;">
+                        <i class="fa-solid fa-floppy-disk"></i> Save Actual Bill
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bottom: Bill History -->
+    <div class="em-card">
+        <div class="em-card-header">
+            <span class="em-card-header-title">
+                <i class="fa-solid fa-clock-rotate-left" style="color: var(--green); margin-right: 8px;"></i>
+                Bill History
+            </span>
+        </div>
+        <div class="em-card-body">
+            {% if bill_history %}
+            <div class="bill-history-table" style="overflow-x: auto;">
+                <table style="width: 100%; font-size: 13px; border-collapse: collapse;">
+                    <thead>
+                        <tr style="border-bottom: 2px solid var(--border); text-align: left;">
+                            <th style="padding: 10px 8px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; font-size: 11px; letter-spacing: 0.4px;">Month</th>
+                            <th style="padding: 10px 8px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; font-size: 11px; letter-spacing: 0.4px;">Predicted</th>
+                            <th style="padding: 10px 8px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; font-size: 11px; letter-spacing: 0.4px;">Actual</th>
+                            <th style="padding: 10px 8px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; font-size: 11px; letter-spacing: 0.4px;">Difference</th>
+                            <th style="padding: 10px 8px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; font-size: 11px; letter-spacing: 0.4px;">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for bill in bill_history %}
+                        <tr style="border-bottom: 1px solid var(--border);">
+                            <td style="padding: 10px 8px; color: var(--navy); font-weight: 600;">
+                                {{ ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][bill.month-1] }} {{ bill.year }}
+                            </td>
+                            <td style="padding: 10px 8px; color: var(--text-mid);">
+                                {{ bill.predicted_amount | naira if bill.predicted_amount else '--' }}
+                            </td>
+                            <td style="padding: 10px 8px; color: var(--text-mid);">
+                                {{ bill.actual_amount | naira if bill.actual_amount else '--' }}
+                            </td>
+                            <td style="padding: 10px 8px; font-weight: 600; {% if bill.actual_amount and bill.predicted_amount and bill.actual_amount < bill.predicted_amount %}color: var(--green);{% elif bill.actual_amount and bill.predicted_amount %}color: var(--danger);{% else %}color: var(--text-muted);{% endif %}">
+                                {% if bill.actual_amount and bill.predicted_amount %}
+                                    {% set diff = bill.actual_amount - bill.predicted_amount %}
+                                    {{ diff | naira }} ({{ ((diff / bill.predicted_amount) * 100) | round(1) }}%)
+                                {% else %}
+                                    --
+                                {% endif %}
+                            </td>
+                            <td style="padding: 10px 8px;">
+                                {% if bill.is_settled %}
+                                <span style="display: inline-block; padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; background: rgba(25, 163, 94, 0.1); color: var(--green);">Paid</span>
+                                {% elif bill.predicted_amount %}
+                                <span style="display: inline-block; padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; background: rgba(255, 193, 7, 0.1); color: var(--amber);">Pending</span>
+                                {% else %}
+                                <span style="display: inline-block; padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; background: var(--surface-2); color: var(--text-muted);">Awaiting Bill</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div style="text-align: center; padding: 40px 20px;">
+                <i class="fa-solid fa-clock-rotate-left" style="color: var(--green); font-size: 36px; opacity: 0.6; margin-bottom: 16px;"></i>
+                <p style="color: var(--text-mid); font-size: 13px;">No bill history yet. Your records will appear here after you save actual bills.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+</div>
+
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .anomaly-alert {
+        animation: slideIn 0.3s ease;
+    }
+
+    @keyframes slideIn {
+        from { opacity: 0; transform: translateY(-10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    .predict-row-1 {
+        display: grid !important;
+        grid-template-columns: 1fr 320px !important;
+        gap: 20px;
+        align-items: start;
+        margin-bottom: 20px;
+    }
+
+    .predict-row-2 {
+        display: grid !important;
+        grid-template-columns: 1fr 1fr !important;
+        gap: 20px;
+        align-items: start;
+        margin-bottom: 20px;
+    }
+
+    .predict-row-1 > .em-card,
+    .predict-row-2 > .em-card {
+        margin-bottom: 0 !important;
+        height: 100%;
+        box-sizing: border-box;
+    }
+
+    .predicted-amount { font-size: clamp(32px, 3.4vw, 44px) !important; letter-spacing:-1px; }
+    @media (max-width: 768px) {
+        .predicted-amount { font-size:32px !important; }
+        .predict-row-1,
+        .predict-row-2 {
+            display: flex !important;
+            flex-direction: column !important;
+            gap: 16px;
+        }
+
+        .predict-row-1 > .em-card,
+        .predict-row-2 > .em-card {
+            height: auto;
+            width: 100%;
+        }
+
+        .predicted-amount {
+            font-size: 32px !important;
+        }
+
+        .bill-history-table {
+            overflow-x: auto;
+            display: block;
+        }
+    }
+</style>
+{% endblock %}

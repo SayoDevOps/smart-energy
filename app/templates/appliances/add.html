@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}Add Appliance - Smart Energy Monitor{% endblock %}
+{% block page_title %}Add Appliance{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6 col-lg-5">
+        <div class="em-card appliance-form-panel">
+            <div class="em-card-body">
+                <form method="POST">
+                    <div class="mb-3">
+                        <label class="form-label">Appliance Name</label>
+                        <input type="text" name="name" class="form-control" placeholder="e.g., LG Split AC 1.5HP" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Power Rating (Watts)</label>
+                        <input type="number" name="wattage" class="form-control" placeholder="e.g. 1100" required min="1" max="20000" step="1">
+                        <div class="form-hint">
+                            Enter watts (W). Typical range: 9W (LED bulb) to 3000W (water heater). Max: 20,000W.
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Average Daily Hours</label>
+                        <input type="number" step="0.1" name="avg_daily_hours" class="form-control" placeholder="e.g., 6.0" required min="0.1" max="24">
+                    </div>
+                    <div class="mb-4">
+                        <label class="form-label">Category</label>
+                        <select name="category" class="form-select">
+                            <option value="cooling">Cooling (AC, Fan)</option>
+                            <option value="lighting">Lighting</option>
+                            <option value="cooking">Cooking</option>
+                            <option value="refrigeration">Refrigeration</option>
+                            <option value="entertainment">Entertainment</option>
+                            <option value="water">Water & Pumping</option>
+                            <option value="laundry">Laundry & Ironing</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn-em-primary flex-fill">Add Appliance</button>
+                        <a href="{{ url_for('appliances.list_appliances') }}" class="btn-em-secondary flex-fill">Cancel</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}Edit Appliance - Smart Energy Monitor{% endblock %}
+{% block page_title %}Edit Appliance{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6 col-lg-5">
+        <div class="em-card appliance-form-panel">
+            <div class="em-card-body">
+                <form method="POST">
+                    <div class="mb-3">
+                        <label class="form-label">Appliance Name</label>
+                        <input type="text" name="name" class="form-control" value="{{ appliance.name }}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Power Rating (Watts)</label>
+                        <input type="number" name="wattage" class="form-control" value="{{ appliance.wattage|int }}" required min="1" max="20000" step="1">
+                        <div class="form-hint">
+                            Enter watts (W). Typical range: 9W (LED bulb) to 3000W (water heater). Max: 20,000W.
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Average Daily Hours</label>
+                        <input type="number" step="0.1" name="avg_daily_hours" class="form-control" value="{{ appliance.avg_daily_hours }}" required min="0.1" max="24">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Category</label>
+                        <select name="category" class="form-select">
+                            {% set categories = [('cooling','Cooling'),('lighting','Lighting'),('cooking','Cooking'),('refrigeration','Refrigeration'),('entertainment','Entertainment'),('other','Other')] %}
+                            {% for val, label in categories %}
+                            <option value="{{ val }}" {% if appliance.category == val %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-4 form-check">
+                        <input type="checkbox" class="form-check-input" name="is_active" id="is_active" {% if appliance.is_active %}checked{% endif %}>
+                        <label class="form-check-label" for="is_active">Active (include in calculations)</label>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn-em-primary flex-fill">Update</button>
+                        <a href="{{ url_for('appliances.list_appliances') }}" class="btn-em-secondary flex-fill">Cancel</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

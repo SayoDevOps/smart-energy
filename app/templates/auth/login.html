@@ -1,0 +1,150 @@
+{% extends "base.html" %}
+{% block title %}Login — Smart Energy Monitor{% endblock %}
+
+{% block auth_content %}
+
+<div class="login-header">
+    <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
+        <i class="fa-solid fa-bolt" style="color: var(--green); --fa-rotate-angle: 169deg; font-size: 24px;"></i>
+        <h1 class="auth-form-title">Welcome back</h1>
+    </div>
+    <p class="auth-form-subtitle">Sign in to your energy dashboard</p>
+</div>
+
+<form method="POST" novalidate>
+
+    <div class="mb-3">
+        <label class="form-label">Full Name</label>
+        <div class="input-icon-wrap">
+            <i class="fa-solid fa-user"
+               style="position:absolute;
+                      left:13px; top:50%;
+                      transform:translateY(-50%);
+                      color:var(--text-muted);
+                      pointer-events:none;
+                      z-index:2;
+                      font-size:14px;">
+            </i>
+            <input
+                type="text"
+                name="full_name"
+                class="form-control"
+                placeholder="e.g. Adebayo Samuel"
+                autocomplete="name"
+                required>
+        </div>
+        <div class="form-hint">
+            Enter the name you registered with.
+            Not case-sensitive.
+        </div>
+    </div>
+
+    <div class="mb-4">
+        <div class="d-flex justify-content-between align-items-center mb-1">
+            <label class="form-label mb-0">Password</label>
+        </div>
+        <div class="input-icon-wrap">
+            <i class="fa-solid fa-lock"></i>
+            <input
+                type="password"
+                name="password"
+                id="loginPassword"
+                class="form-control has-toggle"
+                placeholder="••••••••"
+                autocomplete="current-password"
+                required>
+            <button type="button"
+                    class="eye-toggle"
+                    id="loginTogglePassword"
+                    aria-label="Toggle password visibility">
+                <i class="fa-solid fa-eye" id="loginToggleIcon"></i>
+            </button>
+        </div>
+    </div>
+
+    <button type="submit" class="btn-em-primary w-100" style="padding: 13px 24px; font-size: 15px;">
+        <i class="fa-solid fa-arrow-right-to-bracket"></i>
+        Sign In
+    </button>
+
+</form>
+
+<div class="login-divider">
+    <span>New to EnergyMS?</span>
+</div>
+
+<a href="{{ url_for('auth.register') }}" class="btn-em-secondary w-100" style="justify-content: center; padding: 11px 24px;">
+    <i class="fa-solid fa-user-plus"></i>
+    Create a free account
+</a>
+
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .login-header { margin-bottom: 32px; }
+
+    .login-divider {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin: 22px 0;
+        font-size: 12.5px;
+        color: var(--text-muted);
+    }
+    .login-divider::before,
+    .login-divider::after {
+        content: '';
+        flex: 1;
+        height: 1px;
+        background: var(--border);
+    }
+
+    /* Mobile responsiveness */
+    @media (max-width: 768px) {
+        .login-header {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            width: 100%;
+            margin-bottom: 24px;
+            gap: 4px;
+        }
+
+        .login-header .auth-form-title {
+            width: 100%;
+            display: block;
+            font-size: 1.5rem;
+            line-height: 1.2;
+            margin-bottom: 2px;
+            word-break: break-word;
+        }
+
+        .login-header .auth-form-subtitle {
+            width: 100%;
+            display: block;
+            font-size: 0.875rem;
+            margin-bottom: 0;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const loginToggleBtn = document.getElementById('loginTogglePassword');
+if (loginToggleBtn) {
+    loginToggleBtn.addEventListener('click', function() {
+        const input = document.getElementById('loginPassword');
+        const icon = document.getElementById('loginToggleIcon');
+        if (input.type === 'password') {
+            input.type = 'text';
+            icon.className = 'fa-solid fa-eye-slash';
+        } else {
+            input.type = 'password';
+            icon.className = 'fa-solid fa-eye';
+        }
+    });
+}
+</script>
+{% endblock %}

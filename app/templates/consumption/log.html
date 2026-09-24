@@ -1,0 +1,460 @@
+{% extends "base.html" %}
+
+{% block title %}Log Energy Usage - Smart Energy Monitor{% endblock %}
+{% block page_title %}Log Energy Usage{% endblock %}
+{% block page_subtitle %}<p class="app-page-subtitle">Record your daily meter reading or generator hours.</p>{% endblock %}
+
+{% block content %}
+
+<div class="log-page-grid">
+    <!-- LEFT COLUMN: Form -->
+    <div class="form-col">
+        <div class="em-card">
+            <div class="em-card-body">
+                <form method="POST" action="{{ url_for('consumption.log_consumption') }}">
+                    <!-- FIELD 1: Date -->
+                    <div class="mb-4">
+                        <label class="form-label">
+                            <i class="fa-solid fa-calendar-days" style="color: var(--green); margin-right: 6px;"></i>
+                            Date
+                        </label>
+                        <input type="date" name="log_date" class="form-control"
+                               value="{{ today }}" max="{{ today }}" required>
+                        <div class="form-hint">
+                            <i class="fa-solid fa-circle-info" style="font-size:11px;"></i>
+                            Cannot log future dates.
+                        </div>
+                    </div>
+
+                    <!-- FIELD 2: kWh Consumed -->
+                    <div class="mb-4">
+                        <label class="form-label">
+                            <i class="fa-solid fa-gauge-high" style="color: var(--green); margin-right: 6px;"></i>
+                            Energy Used (kWh)
+                        </label>
+                        <input type="number" name="kwh_consumed" id="kwhInput"
+                               class="form-control" min="0.01" max="500" step="0.01"
+                               placeholder="e.g. 4.5" required>
+                        <div class="form-hint">Check your prepaid meter or estimate from generator hours.</div>
+                    </div>
+
+                    <!-- FIELD 3: Source Toggle -->
+                    <div class="mb-4">
+                        <label class="form-label">Source</label>
+                        <div class="source-toggle-group">
+                            <input type="radio" class="source-check" name="source" id="sourceGrid" value="grid" checked>
+                            <label class="source-btn source-btn--active" for="sourceGrid">
+                                <i class="fa-solid fa-tower-broadcast"></i>
+                                <span>NERC Grid</span>
+                            </label>
+
+                            <input type="radio" class="source-check" name="source" id="sourceGen" value="generator">
+                            <label class="source-btn" for="sourceGen">
+                                <i class="fa-solid fa-gas-pump"></i>
+                                <span>Generator</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- FIELD 3B: Generator Hours (conditional) -->
+                    <div class="mb-4 generator-fields" id="generatorFields" style="display: none;">
+                        <label class="form-label">
+                            <i class="fa-solid fa-clock" style="color: var(--green); margin-right: 6px;"></i>
+                            Generator Hours Run
+                        </label>
+                        <input type="number" name="generator_hours" id="genHours"
+                               class="form-control" min="0.5" max="24" step="0.5"
+                               placeholder="e.g. 4">
+                        <div class="form-hint">How many hours did your generator run?</div>
+                    </div>
+
+                    <!-- FIELD 4: Fuel Cost (conditional) -->
+                    <div class="mb-4 generator-fields" id="fuelCostField" style="display: none;">
+                        <label class="form-label">
+                            <i class="fa-solid fa-naira-sign" style="color: var(--green); margin-right: 6px;"></i>
+                            Fuel Cost (&#8358;)
+                        </label>
+                        <input type="number" name="fuel_cost" id="fuelCost"
+                               class="form-control" min="0" step="50"
+                               placeholder="e.g. 5200">
+                        <div class="form-hint">Total naira spent on petrol for this session.</div>
+                    </div>
+
+                    <!-- FIELD 5: Appliance (Optional) -->
+                    <div class="mb-4">
+                        <label class="form-label">Appliance (Optional)</label>
+                        <select name="appliance_id" class="form-select">
+                            <option value="">-- Total / Not specific --</option>
+                            {% for app in appliances %}
+                            <option value="{{ app.id }}">{{ app.name }} ({{ app.wattage }}W)</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <!-- FIELD 6: Notes -->
+                    <div class="mb-4">
+                        <label class="form-label">
+                            <i class="fa-solid fa-note-sticky" style="color: var(--green); margin-right: 6px;"></i>
+                            Notes (Optional)
+                        </label>
+                        <textarea name="notes" class="form-control" rows="3"
+                                  style="resize: none;"
+                                  placeholder="e.g. 'NERC was out from 6pm, ran gen till midnight'"></textarea>
+                    </div>
+
+                    <!-- Submit Button -->
+                    <button type="submit" class="btn-em-primary w-100" style="justify-content: center;">
+                        <i class="fa-solid fa-floppy-disk"></i>
+                        Save Log Entry
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- RIGHT COLUMN: Cost Widget -->
+    <div class="cost-widget-col">
+        <div class="em-card" style="position: sticky; top: 80px;">
+            <div class="em-card-header">
+                <span class="em-card-header-title">
+                    <i class="fa-solid fa-calculator" style="color: var(--green); margin-right: 8px;"></i>
+                    Cost Preview
+                </span>
+            </div>
+            <div class="em-card-body" id="costWidgetBody">
+                <!-- 1. Estimated Cost (Grid) -->
+                <div class="cost-preview-item">
+                    <div class="cost-preview-label">Estimated Cost</div>
+                    <div class="cost-preview-value" id="estimatedCost">&#x20A6;0.00</div>
+                    <div class="cost-preview-sub" id="bandRateLabel">At your Band -- rate</div>
+                </div>
+
+                <!-- 2. Cost with VAT -->
+                <div class="cost-preview-item">
+                    <div class="cost-preview-label">Cost with VAT (7.5%)</div>
+                    <div class="cost-preview-value" id="costWithVat">&#x20A6;0.00</div>
+                    <div class="cost-preview-sub cost-preview-note">VAT is charged on all electricity purchases per Federal Government directive</div>
+                </div>
+
+                <!-- 3. Prepaid Token Estimate -->
+                <div class="cost-preview-item" style="border-top: 1px solid var(--border); padding-top: 16px; margin-top: 16px;">
+                    <div class="cost-preview-label">Prepaid Token Estimate</div>
+                    <div class="cost-preview-sub" style="margin-bottom: 10px;">How much do you want to recharge?</div>
+                    <div class="recharge-input-wrap">
+                        <input type="number" id="rechargeInput" class="form-control" 
+                               placeholder="e.g. 5000" style="font-size: 14px; padding: 8px 12px;">
+                    </div>
+                    <div class="cost-preview-value" id="tokenEstimate" style="margin-top: 10px; font-size: 16px;">Enter amount to see kWh estimate</div>
+                    <div class="cost-preview-sub" id="daysEstimate">Log 7 days to see days estimate</div>
+                </div>
+
+                <!-- 4. Generator Cost Comparison (hidden by default) -->
+                <div class="cost-preview-item generator-comparison" id="genComparison" style="display: none; border-top: 1px solid var(--border); padding-top: 16px; margin-top: 16px;">
+                    <div class="cost-preview-label" style="color: var(--amber);">Generator Cost Comparison</div>
+                    <div class="cost-preview-sub" id="genCostSession">Generator cost this session: &#x20A6;0</div>
+                    <div class="cost-preview-sub" id="genCostPerKwh">That's &#x20A6;0 per kWh from generator</div>
+                    <div class="cost-preview-sub" id="gridEquivalent">Grid equivalent would cost: &#x20A6;0</div>
+                    <div class="cost-preview-sub" id="genMultiplier" style="font-weight: 600; color: var(--amber);">Generator is 0x more expensive than grid</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* Two-column layout */
+    .log-page-grid {
+        display: grid;
+        grid-template-columns: 1fr 360px;
+        gap: 24px;
+        align-items: start;
+    }
+
+    @media (max-width: 900px) {
+        .log-page-grid {
+            grid-template-columns: 1fr !important;
+        }
+        .cost-widget-col {
+            order: 2;
+        }
+        .form-col {
+            order: 1;
+        }
+    }
+
+    /* Source toggle buttons */
+    .source-toggle-group {
+        display: flex;
+        gap: 0;
+        border-radius: var(--radius);
+        overflow: hidden;
+        border: 1.5px solid var(--border);
+    }
+
+    .source-check {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        margin: 0;
+        opacity: 0;
+    }
+
+    .source-check:focus-visible + .source-btn {
+        outline: 2px solid var(--navy);
+        outline-offset: -3px;
+    }
+
+    .source-btn {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        padding: 10px 16px;
+        background: var(--surface);
+        color: var(--text-mid);
+        font-size: 13.5px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.15s;
+        border-right: 1px solid var(--border);
+        font-family: 'DM Sans', sans-serif;
+    }
+
+    .source-btn:last-child {
+        border-right: none;
+    }
+
+    .source-btn:hover {
+        background: var(--surface-2);
+    }
+
+    .source-btn--active,
+    .source-check:checked + .source-btn {
+        background: var(--green);
+        color: white;
+        border-color: var(--green);
+    }
+
+    .source-btn--active i,
+    .source-check:checked + .source-btn i {
+        color: white;
+    }
+
+    /* Cost preview widget */
+    .cost-preview-item {
+        padding: 8px 0;
+    }
+
+    .cost-preview-label {
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.4px;
+        margin-bottom: 4px;
+    }
+
+    .cost-preview-value {
+        font-family: 'DM Sans', sans-serif;
+        font-size: 24px;
+        font-weight: 800;
+        color: var(--navy);
+        line-height: 1.2;
+        text-decoration: none !important;
+    }
+
+    .cost-preview-sub {
+        font-size: 12px;
+        color: var(--text-muted);
+        margin-top: 4px;
+    }
+
+    .cost-preview-note {
+        font-size: 11px;
+        line-height: 1.4;
+    }
+
+    .recharge-input-wrap {
+        display: flex;
+        gap: 8px;
+    }
+
+    .recharge-input-wrap .form-control {
+        font-size: 14px;
+        padding: 8px 12px;
+    }
+
+    .generator-fields {
+        animation: fadeIn 0.2s ease;
+    }
+
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(-8px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Date input styling */
+    input[type="date"] {
+        appearance: none;
+        -webkit-appearance: none;
+        background: var(--surface-2);
+        border: 1.5px solid var(--border);
+        border-radius: var(--radius);
+        padding: 10px 14px;
+        font-size: 14px;
+        font-family: 'DM Sans', sans-serif;
+        color: var(--text);
+        width: 100%;
+        cursor: pointer;
+        transition: border-color 0.2s, box-shadow 0.2s;
+        outline: none;
+    }
+
+    input[type="date"]:focus {
+        border-color: var(--green);
+        box-shadow: 0 0 0 3px var(--green-glow);
+        background: var(--surface);
+    }
+
+    input[type="date"]::-webkit-calendar-picker-indicator {
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='%2319a35e' viewBox='0 0 16 16'%3E%3Cpath d='M3.5 0a.5.5 0 0 1 .5.5V1h8V.5a.5.5 0 0 1 1 0V1h1a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V3a2 2 0 0 1 2-2h1V.5a.5.5 0 0 1 .5-.5zM1 4v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V4H1z'/%3E%3C/svg%3E");
+        cursor: pointer;
+        opacity: 0.8;
+        padding: 2px;
+    }
+
+    input[type="date"]::-webkit-calendar-picker-indicator:hover {
+        opacity: 1;
+    }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Pass data from Flask to JavaScript
+const TARIFF_RATE = {{ tariff_rate }};
+const BAND_NAME = '{{ current_user.tariff_band.band if current_user.tariff_band else "--" }}';
+const BAND_RATE_DISPLAY = formatNaira(TARIFF_RATE);
+const AVG_DAILY_KWH = {{ avg_daily_kwh | default(0) }};
+
+// Format Naira currency
+function formatNaira(val) {
+    if (isNaN(val) || !val) {
+        return '\u20A6' + '0.00';
+    }
+    return '\u20A6' + parseFloat(val)
+        .toLocaleString('en-NG', {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
+        });
+}
+
+// DOM Elements
+const kwhInput = document.getElementById('kwhInput');
+const sourceGrid = document.getElementById('sourceGrid');
+const sourceGen = document.getElementById('sourceGen');
+const generatorFields = document.getElementById('generatorFields');
+const fuelCostField = document.getElementById('fuelCostField');
+const genHours = document.getElementById('genHours');
+const fuelCost = document.getElementById('fuelCost');
+const rechargeInput = document.getElementById('rechargeInput');
+
+// Cost display elements
+const estimatedCost = document.getElementById('estimatedCost');
+const costWithVat = document.getElementById('costWithVat');
+const bandRateLabel = document.getElementById('bandRateLabel');
+const tokenEstimate = document.getElementById('tokenEstimate');
+const daysEstimate = document.getElementById('daysEstimate');
+const genComparison = document.getElementById('genComparison');
+const genCostSession = document.getElementById('genCostSession');
+const genCostPerKwh = document.getElementById('genCostPerKwh');
+const gridEquivalent = document.getElementById('gridEquivalent');
+const genMultiplier = document.getElementById('genMultiplier');
+
+// Update band label
+bandRateLabel.textContent = `At your Band ${BAND_NAME} rate (${BAND_RATE_DISPLAY}/kWh)`;
+
+// Calculate and update costs
+function updateCosts() {
+    const kwh = parseFloat(kwhInput.value) || 0;
+    
+    // Estimated cost (grid)
+    const estCost = kwh * TARIFF_RATE;
+    estimatedCost.textContent = formatNaira(estCost);
+    
+    // Cost with VAT (7.5%)
+    const vatCost = estCost * 1.075;
+    costWithVat.textContent = formatNaira(vatCost);
+    
+    // Prepaid token estimate
+    const rechargeAmount = parseFloat(rechargeInput.value) || 0;
+    if (rechargeAmount > 0) {
+        const tokenKwh = rechargeAmount / TARIFF_RATE;
+        tokenEstimate.textContent = `${formatNaira(rechargeAmount)} buys approx ${tokenKwh.toFixed(1)} kWh`;
+        
+        // Days estimate
+        if (AVG_DAILY_KWH > 0) {
+            const days = tokenKwh / AVG_DAILY_KWH;
+            daysEstimate.textContent = `Lasts ~${Math.round(days)} days at your current usage`;
+        } else {
+            daysEstimate.textContent = 'Log 7 days to see days estimate';
+        }
+    } else {
+        tokenEstimate.textContent = `Enter amount above to see kWh estimate`;
+        daysEstimate.textContent = AVG_DAILY_KWH > 0 ? `Your avg: ${AVG_DAILY_KWH} kWh/day` : 'Log 7 days to see days estimate';
+    }
+    
+    // Generator comparison (only if generator is selected)
+    if (sourceGen.checked) {
+        const fCost = parseFloat(fuelCost.value) || 0;
+        if (kwh > 0 && fCost > 0) {
+            const genCostPerKwhVal = fCost / kwh;
+            const gridCostVal = kwh * TARIFF_RATE;
+            const multiplier = genCostPerKwhVal / TARIFF_RATE;
+            
+            genCostSession.textContent = `Generator cost this session: ${formatNaira(fCost)}`;
+            genCostPerKwh.textContent = `That's ${formatNaira(genCostPerKwhVal)} per kWh from generator`;
+            gridEquivalent.textContent = `Grid equivalent would cost: ${formatNaira(gridCostVal)}`;
+            genMultiplier.textContent = `Generator is ${multiplier.toFixed(1)}x more expensive than grid`;
+            
+            genComparison.style.display = 'block';
+        } else if (kwh > 0) {
+            genCostSession.textContent = `Generator cost this session: ${formatNaira(parseFloat(fuelCost.value) || 0)}`;
+            genComparison.style.display = 'block';
+        }
+    }
+}
+
+// Toggle source
+function setSource(source) {
+    if (source === 'generator') {
+        generatorFields.style.display = 'block';
+        fuelCostField.style.display = 'block';
+        sourceGen.nextElementSibling.classList.add('source-btn--active');
+        sourceGrid.nextElementSibling.classList.remove('source-btn--active');
+    } else {
+        generatorFields.style.display = 'none';
+        fuelCostField.style.display = 'none';
+        sourceGrid.nextElementSibling.classList.add('source-btn--active');
+        sourceGen.nextElementSibling.classList.remove('source-btn--active');
+    }
+    updateCosts();
+}
+
+// Event listeners
+sourceGrid.addEventListener('change', () => setSource('grid'));
+sourceGen.addEventListener('change', () => setSource('generator'));
+kwhInput.addEventListener('input', updateCosts);
+rechargeInput.addEventListener('input', updateCosts);
+genHours.addEventListener('input', updateCosts);
+fuelCost.addEventListener('input', updateCosts);
+
+// Initialize
+setSource('grid');
+updateCosts();
+</script>
+{% endblock %}
